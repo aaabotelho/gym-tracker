@@ -1,0 +1,93 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>Gym Tracker</title>
+
+    <link rel="stylesheet" href="style.css">
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#192743">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black">
+</head>
+
+<body>
+
+    <div class="app">
+
+        <header>
+            <h1>Gym Tracker</h1>
+        </header>
+
+        <main>
+        
+            <section id="day-selection">
+        
+                <h2>Select Workout</h2>
+        
+                <div id="day-buttons"></div>
+        
+                <section id="workout-history">
+        
+                    <h3>History</h3>
+        
+                    <button
+                        type="button"
+                        onclick="showHistoryPage()"
+                    >
+                        View Workout History
+                    </button>
+        
+                </section>
+        
+                <section id="plan-import">
+        
+                    <h3>Workout Plan</h3>
+        
+                    <input
+                        type="file"
+                        id="plan-file"
+                        accept=".csv"
+                    >
+        
+                    <button
+                        type="button"
+                        onclick="importPlan()"
+                    >
+                        Import Workout Plan
+                    </button>
+        
+                </section>
+        
+                <section id="reset-data">
+        
+                    <h3>Data</h3>
+        
+                    <button
+                        type="button"
+                        onclick="resetWorkoutData()"
+                    >
+                        Reset Workout Data
+                    </button>
+        
+                </section>
+        
+            </section>
+        
+            <div id="workout"></div>
+        
+        </main>
+        
+        
+
+    </div>
+
+    <script src="app.js"></script>
+
+</body>
+</html>
+
