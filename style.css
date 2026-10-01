@@ -525,3 +525,174 @@ input[type="file"] {
     outline: none;
     border-color: #192743;
 }
+
+.number-picker-input {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 12px;
+    margin-top: 6px;
+
+    border: 1px solid #d1d5db;
+    border-radius: 10px;
+
+    background: white;
+    color: #17181a;
+
+    font-family: inherit;
+    font-size: 16px;
+    text-align: center;
+
+    cursor: pointer;
+}
+
+.number-picker-input:focus {
+    outline: none;
+    border-color: #192743;
+}
+
+.number-picker-input::placeholder {
+    color: #9ca3af;
+}
+
+.number-picker-overlay {
+    position: fixed;
+    inset: 0;
+
+    background: rgba(0, 0, 0, 0.55);
+
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+
+    z-index: 9999;
+}
+
+.number-picker {
+    width: 100%;
+    max-width: 500px;
+
+    background: white;
+
+    border-radius: 20px 20px 0 0;
+
+    padding: 20px;
+
+    box-sizing: border-box;
+}
+
+.number-picker h3 {
+    text-align: center;
+    margin: 0 0 15px;
+}
+
+/* The visible wheel area */
+.number-picker-list {
+    position: relative;
+
+    height: 240px;
+
+    overflow-y: auto;
+
+    display: flex;
+    flex-direction: column;
+
+    scroll-snap-type: y mandatory;
+
+    padding: 96px 0;
+
+    scrollbar-width: none;
+}
+
+.number-picker-list::-webkit-scrollbar {
+    display: none;
+}
+
+/* Fixed highlighted center area */
+.number-picker-list::before {
+    content: "";
+
+    position: absolute;
+
+    left: 0;
+    right: 0;
+
+    top: 96px;
+
+    height: 48px;
+
+    background: #eef1f6;
+
+    border-radius: 10px;
+
+    pointer-events: none;
+
+    z-index: 0;
+}
+
+/* Picker values */
+.number-picker-option {
+    position: relative;
+
+    z-index: 1;
+
+    flex: 0 0 48px;
+
+    width: 100%;
+
+    border: none;
+
+    background: transparent;
+
+    font-size: 21px;
+
+    font-weight: 400;
+
+    color: #777;
+
+    scroll-snap-align: center;
+
+    cursor: pointer;
+
+    transition:
+        font-size 0.15s,
+        font-weight 0.15s,
+        color 0.15s;
+}
+
+/* Currently centered value */
+.number-picker-option.selected {
+    font-size: 26px;
+
+    font-weight: 600;
+
+    color: #192743;
+}
+
+/* Bottom buttons */
+.number-picker-actions {
+    display: flex;
+
+    gap: 10px;
+
+    margin-top: 15px;
+}
+
+.number-picker-actions button {
+    flex: 1;
+
+    padding: 14px;
+
+    border: none;
+
+    border-radius: 10px;
+
+    font-size: 16px;
+
+    background: #e5e7eb;
+}
+
+.number-picker-actions .picker-done {
+    background: #192743;
+
+    color: white;
+}

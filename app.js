@@ -1,4 +1,4 @@
-console.log("GYM TRACKER APP JS - VERSION 19");
+console.log("GYM TRACKER APP JS - VERSION 20");
 
 let workouts = [];
 let activeWorkout = null;
@@ -535,8 +535,7 @@ function createSets(
     let html = "";
 
     /*
-     * First look for this exercise
-     * in the current active workout.
+     * Current active workout
      */
     const activeExercise =
         activeWorkout?.exercises?.find(
@@ -546,8 +545,7 @@ function createSets(
         );
 
     /*
-     * If it hasn't been saved in the current
-     * workout, use the latest completed workout.
+     * Previous completed workout
      */
     let previousWorkout = null;
 
@@ -590,8 +588,8 @@ function createSets(
     }
 
     /*
-     * Current active workout takes priority.
-     * Otherwise use the previous completed workout.
+     * Active workout takes priority.
+     * Otherwise use previous workout.
      */
     const workoutData =
         activeExercise ||
@@ -600,6 +598,9 @@ function createSets(
     const previousWeight =
         workoutData?.weight || "";
 
+    /*
+     * Weight
+     */
     html += `
         <div class="weight-input">
 
@@ -608,18 +609,24 @@ function createSets(
             </label>
 
             <input
-                type="number"
-                step="0.5"
-                placeholder="kg"
+                type="text"
+                readonly
+                class="number-picker-input"
                 value="${previousWeight}"
+                placeholder="Select kg"
                 id="weight-${dayIndex}-${exerciseIndex}"
+                onclick="openNumberPicker(
+                    'weight',
+                    'weight-${dayIndex}-${exerciseIndex}'
+                )"
             >
-
-            <span>kg</span>
 
         </div>
     `;
 
+    /*
+     * Reps
+     */
     for (
         let i = 0;
         i < exercise.sets;
@@ -640,10 +647,16 @@ function createSets(
                 </strong>
 
                 <input
-                    type="number"
-                    placeholder="reps"
+                    type="text"
+                    readonly
+                    class="number-picker-input"
                     value="${previousReps}"
+                    placeholder="Select reps"
                     id="reps-${dayIndex}-${exerciseIndex}-${i}"
+                    onclick="openNumberPicker(
+                        'reps',
+                        'reps-${dayIndex}-${exerciseIndex}-${i}'
+                    )"
                 >
 
             </div>
@@ -1630,6 +1643,483 @@ if ("serviceWorker" in navigator) {
 
     });
 
+}
+
+function getWeightValues() {
+
+    const values = [];
+
+    // 0 to 50 in 0.5 kg increments
+    for (
+        let value = 0;
+        value <= 50;
+        value += 0.5
+    ) {
+        values.push(value);
+    }
+
+    // 52.5 to 100 in 2.5 kg increments
+    for (
+        let value = 52.5;
+        value <= 100;
+        value += 2.5
+    ) {
+        values.push(value);
+    }
+
+    // 105 to 250 in 5 kg increments
+    for (
+        let value = 105;
+        value <= 250;
+        value += 5
+    ) {
+        values.push(value);
+    }
+
+    return values;
+}
+
+
+function getRepValues() {
+
+    const values = [];
+
+    for (
+        let value = 1;
+        value <= 15;
+        value++
+    ) {
+        values.push(value);
+    }
+
+    return values;
+}
+
+
+function openNumberPicker(
+    type,
+    inputId
+) {
+
+    const input =
+        document.getElementById(inputId);
+
+    if (!input) {
+        return;
+    }
+
+    const values =
+        type === "weight"
+            ? getWeightValues()
+            : getRepValues();
+
+    const currentValue =
+        input.value !== ""
+            ? Number(input.value)
+            : values[0];
+
+    let selectedIndex =
+        values.findIndex(
+            value =>
+                value === currentValue
+        );
+
+    if (selectedIndex === -1) {
+        selectedIndex = 0;
+    }
+
+    const title =
+        type === "weight"
+            ? "Weight"
+            : "Reps";
+
+    const unit =
+        type === "weight"
+            ? " kg"
+            : "";
+
+    let html = `
+
+        <div
+            class="number-picker-overlay"
+            onclick="closeNumberPicker(event)"
+        >
+
+            <div
+                class="number-picker"
+                onclick="event.stopPropagation()"
+            >
+
+                <h3>
+                    ${title}
+                </h3>
+
+                <div
+                    class="number-picker-list"
+                    id="number-picker-list"
+                >
+    `;
+
+    values.forEach(
+        (value, index) => {
+
+            html += `
+
+                <button
+                    type="button"
+                    class="number-picker-option ${
+                        index === selectedIndex
+                            ? "selected"
+                            : ""
+                    }"
+                    data-index="${index}"
+                >
+                    ${value}${unit}
+                </button>
+            `;
+        }
+    );
+
+    html += `
+
+                </div>
+
+                <div
+                    class="number-picker-actions"
+                >
+
+                    <button
+                        type="button"
+                        onclick="cancelNumberPicker()"
+                    >
+                        Cancel
+                    </button>
+
+                    <button
+                        type="button"
+                        class="picker-done"
+                        onclick="confirmNumberPicker()"
+                    >
+                        Done
+                    </button>
+
+                </div>
+
+            </div>
+
+        </div>
+    `;
+
+    const picker =
+        document.createElement("div");
+
+    picker.id =
+        "number-picker-container";
+
+    picker.dataset.inputId =
+        inputId;
+
+    picker.dataset.type =
+        type;
+
+    picker.dataset.originalValue =
+        input.value;
+
+    picker.dataset.selectedIndex =
+        selectedIndex;
+
+    picker.innerHTML =
+        html;
+
+    document.body.appendChild(
+        picker
+    );
+
+    const list =
+        picker.querySelector(
+            "#number-picker-list"
+        );
+
+    /*
+     * Scroll to the current value.
+     */
+    const selected =
+        list.querySelector(
+            ".number-picker-option.selected"
+        );
+
+    if (selected) {
+
+        list.scrollTop =
+            selected.offsetTop -
+            list.clientHeight / 2 +
+            selected.offsetHeight / 2;
+    }
+
+    /*
+     * Update selection while scrolling.
+     */
+    let scrollTimeout;
+
+list.addEventListener(
+    "scroll",
+    () => {
+
+        clearTimeout(
+            scrollTimeout
+        );
+
+        /*
+         * Update the highlighted value
+         * while scrolling.
+         */
+        updatePickerSelection(
+            list
+        );
+
+        /*
+         * When scrolling stops,
+         * smoothly center the selected value.
+         */
+        scrollTimeout =
+            setTimeout(
+                () => {
+
+                    const selected =
+                        list.querySelector(
+                            ".number-picker-option.selected"
+                        );
+
+                    if (!selected) {
+                        return;
+                    }
+
+                    selected.scrollIntoView({
+                        behavior: "smooth",
+                        block: "center"
+                    });
+
+                },
+                120
+            );
+    }
+);
+}
+
+
+function selectNumberPickerValue(
+    value,
+    inputId,
+    type
+) {
+
+    const input =
+        document.getElementById(inputId);
+
+    if (!input) {
+        return;
+    }
+
+    input.value =
+        value;
+
+    /*
+     * Highlight the selected value.
+     */
+    const options =
+        document.querySelectorAll(
+            ".number-picker-option"
+        );
+
+    options.forEach(
+        option => {
+
+            option.classList.remove(
+                "selected"
+            );
+        }
+    );
+
+    options.forEach(
+        option => {
+
+            if (
+                Number(
+                    option.dataset.index
+                ) ===
+                (
+                    type === "weight"
+                        ? getWeightValues()
+                        : getRepValues()
+                ).indexOf(value)
+            ) {
+
+                option.classList.add(
+                    "selected"
+                );
+            }
+        }
+    );
+}
+
+
+function closeNumberPicker(
+    event
+) {
+
+    if (
+        event &&
+        event.target !== event.currentTarget
+    ) {
+        return;
+    }
+
+    const picker =
+        document.getElementById(
+            "number-picker-container"
+        );
+
+    if (picker) {
+        picker.remove();
+    }
+}
+
+function updatePickerSelection(list) {
+
+    const picker =
+        document.getElementById(
+            "number-picker-container"
+        );
+
+    if (!picker) {
+        return;
+    }
+
+    const options =
+        Array.from(
+            list.querySelectorAll(
+                ".number-picker-option"
+            )
+        );
+
+    const listCenter =
+        list.scrollTop +
+        list.clientHeight / 2;
+
+    let closestOption = null;
+    let closestDistance = Infinity;
+
+    options.forEach(
+        option => {
+
+            const optionCenter =
+                option.offsetTop +
+                option.offsetHeight / 2;
+
+            const distance =
+                Math.abs(
+                    optionCenter -
+                    listCenter
+                );
+
+            if (
+                distance <
+                closestDistance
+            ) {
+
+                closestDistance =
+                    distance;
+
+                closestOption =
+                    option;
+            }
+        }
+    );
+
+    if (!closestOption) {
+        return;
+    }
+
+    options.forEach(
+        option => {
+
+            option.classList.remove(
+                "selected"
+            );
+        }
+    );
+
+    closestOption.classList.add(
+        "selected"
+    );
+
+    picker.dataset.selectedIndex =
+        closestOption.dataset.index;
+}
+
+function confirmNumberPicker() {
+
+    const picker =
+        document.getElementById(
+            "number-picker-container"
+        );
+
+    if (!picker) {
+        return;
+    }
+
+    const input =
+        document.getElementById(
+            picker.dataset.inputId
+        );
+
+    if (!input) {
+        picker.remove();
+        return;
+    }
+
+    const type =
+        picker.dataset.type;
+
+    const values =
+        type === "weight"
+            ? getWeightValues()
+            : getRepValues();
+
+    const selectedIndex =
+        Number(
+            picker.dataset.selectedIndex
+        );
+
+    const value =
+        values[selectedIndex];
+
+    if (value !== undefined) {
+
+        input.value =
+            value;
+    }
+
+    picker.remove();
+}
+
+function cancelNumberPicker() {
+
+    const picker =
+        document.getElementById(
+            "number-picker-container"
+        );
+
+    if (!picker) {
+        return;
+    }
+
+    /*
+     * Do not modify the input.
+     * The original value remains intact.
+     */
+
+    picker.remove();
 }
 
 function exportWorkoutHistory() {
