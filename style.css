@@ -482,3 +482,46 @@ input[type="file"] {
 .secondary-button:active {
     background: #d1d5db;
 }
+
+.save-exercise-button {
+    width: 100%;
+    margin-top: 12px;
+    background: #192743;
+    color: white;
+}
+
+.save-exercise-button:active {
+    background: #101b30;
+}
+
+.exercise-saved {
+    background: #2f6b45;
+}
+
+.exercise-saved:active {
+    background: #245337;
+}
+
+.exercise-comment {
+    width: 100%;
+    min-height: 60px;
+    margin-top: 12px;
+    padding: 10px 12px;
+    box-sizing: border-box;
+    border: 1px solid #d1d5db;
+    border-radius: 10px;
+    background: white;
+    color: #17181a;
+    font-family: inherit;
+    font-size: 14px;
+    resize: vertical;
+}
+
+.exercise-comment::placeholder {
+    color: #9ca3af;
+}
+
+.exercise-comment:focus {
+    outline: none;
+    border-color: #192743;
+}

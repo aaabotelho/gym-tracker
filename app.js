@@ -1,5 +1,4 @@
-
-console.log("app.js is working");
+console.log("GYM TRACKER APP JS - VERSION 19");
 
 let workouts = [];
 let activeWorkout = null;
@@ -19,19 +18,84 @@ const workoutContainer =
 const daySelection =
     document.getElementById("day-selection");
 
+restoreActiveWorkout();
 
 function selectDay(dayIndex) {
 
-        daySelection.style.display = "none";
-    
-        activeWorkout = {
-            dayIndex: dayIndex,
-            startedAt: null,
-            sessionId: null
-        };
-    
-        showWorkoutStart(dayIndex);
+    const savedActiveWorkout =
+        localStorage.getItem("active-workout");
+
+    if (savedActiveWorkout) {
+
+        try {
+
+            const savedWorkout =
+                JSON.parse(savedActiveWorkout);
+
+            if (
+                savedWorkout &&
+                savedWorkout.sessionId &&
+                savedWorkout.startedAt
+            ) {
+
+                activeWorkout =
+                    savedWorkout;
+
+                // Same day → resume it
+                if (
+                    activeWorkout.dayIndex === dayIndex
+                ) {
+
+                    daySelection.style.display =
+                        "none";
+
+                    displayWorkout(
+                        activeWorkout.dayIndex
+                    );
+
+                    return;
+                }
+
+                // Different day → don't start another workout
+                alert(
+                    "You already have an active workout.\n\nFinish or reset Day " +
+                    (activeWorkout.dayIndex + 1) +
+                    " before starting another day."
+                );
+
+                return;
+            }
+
+        } catch (error) {
+
+            console.error(
+                "Could not read active workout:",
+                error
+            );
+
+            localStorage.removeItem(
+                "active-workout"
+            );
+        }
     }
+
+    // No active workout → create a new one
+    daySelection.style.display = "none";
+
+    activeWorkout = {
+
+        dayIndex: dayIndex,
+
+        startedAt: null,
+
+        sessionId: null,
+
+        exercises: []
+
+    };
+
+    showWorkoutStart(dayIndex);
+}
 
 function showWorkoutStart(dayIndex) {
 
@@ -74,9 +138,188 @@ function startWorkout() {
     activeWorkout.sessionId =
         crypto.randomUUID();
 
+    activeWorkout.exercises =
+        activeWorkout.exercises || [];
+
+    localStorage.setItem(
+        "active-workout",
+        JSON.stringify(activeWorkout)
+    );
+
+    console.log(
+        "Active workout saved:",
+        activeWorkout
+    );
+
     displayWorkout(
         activeWorkout.dayIndex
     );
+}
+
+function restoreActiveWorkout() {
+
+    const savedActiveWorkout =
+        localStorage.getItem(
+            "active-workout"
+        );
+
+    if (!savedActiveWorkout) {
+        return false;
+    }
+
+    try {
+
+        activeWorkout =
+            JSON.parse(
+                savedActiveWorkout
+            );
+
+        if (
+            activeWorkout &&
+            activeWorkout.sessionId &&
+            activeWorkout.dayIndex !== undefined
+        ) {
+            displayWorkout(
+                activeWorkout.dayIndex
+            );
+
+            daySelection.style.display =
+                "none";
+
+            return true;
+        }
+
+    } catch (error) {
+
+        console.error(
+            "Could not restore active workout:",
+            error
+        );
+
+        localStorage.removeItem(
+            "active-workout"
+        );
+    }
+
+    return false;
+}
+
+function saveExercise(dayIndex, exerciseIndex) {
+
+    if (!activeWorkout) {
+        alert("No active workout.");
+        return;
+    }
+
+    const workout =
+        workouts[dayIndex];
+
+    const exercise =
+        workout.exercises[exerciseIndex];
+
+    const weightInput =
+        document.getElementById(
+            `weight-${dayIndex}-${exerciseIndex}`
+        );
+    
+    const commentInput =
+        document.getElementById(
+            `comment-${dayIndex}-${exerciseIndex}`
+        );
+
+    if (!weightInput) {
+        return;
+    }
+
+    const sets = [];
+
+    for (
+        let i = 0;
+        i < exercise.sets;
+        i++
+    ) {
+
+        const repsInput =
+            document.getElementById(
+                `reps-${dayIndex}-${exerciseIndex}-${i}`
+            );
+
+        sets.push({
+            reps: repsInput
+                ? repsInput.value
+                : ""
+        });
+    }
+
+    const savedExercise = {
+
+        exerciseName:
+            exercise.name,
+    
+        weight:
+            weightInput.value,
+    
+        sets:
+            sets,
+    
+        comment:
+            commentInput
+                ? commentInput.value
+                : ""
+    };
+
+    // Make sure exercises exists
+    activeWorkout.exercises =
+        activeWorkout.exercises || [];
+
+    // Check if this exercise was already saved
+    const existingIndex =
+        activeWorkout.exercises.findIndex(
+            saved =>
+                saved.exerciseName ===
+                exercise.name
+        );
+
+    if (existingIndex !== -1) {
+
+        // Update existing exercise
+        activeWorkout.exercises[
+            existingIndex
+        ] = savedExercise;
+
+    } else {
+
+        // Add new exercise
+        activeWorkout.exercises.push(
+            savedExercise
+        );
+    }
+
+    // Save the updated active workout
+    localStorage.setItem(
+        "active-workout",
+        JSON.stringify(activeWorkout)
+    );
+
+    console.log(
+        "Exercise saved:",
+        savedExercise
+    );
+
+    const saveButton =
+            document.getElementById(
+                `save-exercise-${dayIndex}-${exerciseIndex}`
+            );
+
+        if (saveButton) {
+
+            saveButton.textContent =
+                "Exercise Saved ✓";
+
+            saveButton.classList.add(
+                "exercise-saved"
+            );
+        }
 }
 
 
@@ -131,6 +374,21 @@ function displayWorkout(dayIndex) {
                         exerciseIndex,
                         exercise
                     )}
+                    
+                    <textarea
+                        class="exercise-comment"
+                        id="comment-${dayIndex}-${exerciseIndex}"
+                        placeholder="Comment (optional)"
+                    ></textarea>
+                    
+                    <button
+                        type="button"
+                        class="save-exercise-button"
+                        id="save-exercise-${dayIndex}-${exerciseIndex}"
+                        onclick="saveExercise(${dayIndex}, ${exerciseIndex})"
+                    >
+                        Save Exercise
+                    </button>
 
                     ${displayHistory(
                         dayIndex,
@@ -144,27 +402,128 @@ function displayWorkout(dayIndex) {
 
     html += `
 
-    <button
-        type="button"
-        onclick="finishWorkout()"
-    >
-        Finish Workout
-    </button>
+        <button
+            type="button"
+            onclick="finishWorkout()"
+        >
+            Finish Workout
+        </button>
 
-    <button
-        type="button"
-        class="secondary-button"
-        onclick="resetSession()"
-    >
-        Reset Session
-    </button>
-`;
+        <button
+            type="button"
+            class="secondary-button"
+            onclick="resetSession()"
+        >
+            Reset Session
+        </button>
+    `;
 
     workoutContainer.innerHTML = html;
+
+    restoreExerciseComments();
+
+    updateSaveExerciseButtons();
 }
 
+function restoreExerciseComments() {
 
+    if (!activeWorkout) {
+        return;
+    }
 
+    activeWorkout.exercises?.forEach(
+        savedExercise => {
+
+            const exerciseIndex =
+                workouts[activeWorkout.dayIndex]
+                    .exercises
+                    .findIndex(
+                        exercise =>
+                            exercise.name ===
+                            savedExercise.exerciseName
+                    );
+
+            if (exerciseIndex === -1) {
+                return;
+            }
+
+            const commentInput =
+                document.getElementById(
+                    `comment-${activeWorkout.dayIndex}-${exerciseIndex}`
+                );
+
+            if (commentInput) {
+
+                commentInput.value =
+                    savedExercise.comment || "";
+            }
+        }
+    );
+}
+
+function updateSaveExerciseButtons() {
+
+    const savedActiveWorkout =
+        localStorage.getItem("active-workout");
+
+    if (!savedActiveWorkout) {
+        return;
+    }
+
+    let savedWorkout;
+
+    try {
+
+        savedWorkout =
+            JSON.parse(savedActiveWorkout);
+
+    } catch (error) {
+
+        console.error(
+            "Could not read active workout:",
+            error
+        );
+
+        return;
+    }
+
+    const savedExercises =
+        savedWorkout.exercises || [];
+
+    savedExercises.forEach(
+        savedExercise => {
+
+            const exerciseIndex =
+                workouts[savedWorkout.dayIndex]
+                    .exercises
+                    .findIndex(
+                        exercise =>
+                            exercise.name ===
+                            savedExercise.exerciseName
+                    );
+
+            if (exerciseIndex === -1) {
+                return;
+            }
+
+            const button =
+                document.getElementById(
+                    `save-exercise-${savedWorkout.dayIndex}-${exerciseIndex}`
+                );
+
+            if (!button) {
+                return;
+            }
+
+            button.textContent =
+                "Exercise Saved ✓";
+
+            button.classList.add(
+                "exercise-saved"
+            );
+        }
+    );
+}
 
 
 function createSets(
@@ -175,47 +534,72 @@ function createSets(
 
     let html = "";
 
-    const savedSessions =
-        localStorage.getItem(
-            "workout-sessions"
+    /*
+     * First look for this exercise
+     * in the current active workout.
+     */
+    const activeExercise =
+        activeWorkout?.exercises?.find(
+            savedExercise =>
+                savedExercise.exerciseName ===
+                exercise.name
         );
 
-    const sessions =
-        savedSessions
-            ? JSON.parse(savedSessions)
-            : [];
+    /*
+     * If it hasn't been saved in the current
+     * workout, use the latest completed workout.
+     */
+    let previousWorkout = null;
 
-    // Find the most recent completed session
-    // containing this exercise.
-    const previousSession =
-        sessions
-            .filter(session =>
-                session.dayIndex === dayIndex &&
-                session.exercises.some(
+    if (!activeExercise) {
+
+        const savedSessions =
+            localStorage.getItem(
+                "workout-sessions"
+            );
+
+        const sessions =
+            savedSessions
+                ? JSON.parse(savedSessions)
+                : [];
+
+        const previousSession =
+            sessions
+                .filter(session =>
+                    session.dayIndex === dayIndex &&
+                    session.exercises.some(
+                        savedExercise =>
+                            savedExercise.exerciseName ===
+                            exercise.name
+                    )
+                )
+                .sort(
+                    (a, b) =>
+                        new Date(b.completedAt) -
+                        new Date(a.completedAt)
+                )[0];
+
+        previousWorkout =
+            previousSession
+                ? previousSession.exercises.find(
                     savedExercise =>
                         savedExercise.exerciseName ===
                         exercise.name
                 )
-            )
-            .sort(
-                (a, b) =>
-                    new Date(b.completedAt) -
-                    new Date(a.completedAt)
-            )[0];
+                : null;
+    }
 
-    const previousWorkout =
-        previousSession
-            ? previousSession.exercises.find(
-                savedExercise =>
-                    savedExercise.exerciseName ===
-                    exercise.name
-            )
-            : null;
+    /*
+     * Current active workout takes priority.
+     * Otherwise use the previous completed workout.
+     */
+    const workoutData =
+        activeExercise ||
+        previousWorkout;
 
     const previousWeight =
-        previousWorkout?.weight || "";
+        workoutData?.weight || "";
 
-    // One weight input for the entire exercise
     html += `
         <div class="weight-input">
 
@@ -236,7 +620,6 @@ function createSets(
         </div>
     `;
 
-    // Reps input for each set
     for (
         let i = 0;
         i < exercise.sets;
@@ -244,7 +627,7 @@ function createSets(
     ) {
 
         const previousSet =
-            previousWorkout?.sets?.[i];
+            workoutData?.sets?.[i];
 
         const previousReps =
             previousSet?.reps || "";
@@ -340,6 +723,9 @@ function displayPreviousWorkout(
             .map(set => set.reps)
             .join(" / ");
 
+    const comment =
+        previousExercise.comment || "";
+
     return `
         <div class="previous">
 
@@ -351,6 +737,16 @@ function displayPreviousWorkout(
 
             ${weight} kg —
             ${reps}
+
+            ${
+                comment
+                    ? `
+                        <div class="previous-comment">
+                            ${comment}
+                        </div>
+                    `
+                    : ""
+            }
 
         </div>
     `;
@@ -470,24 +866,95 @@ function displayHistory(
 
 
 
-
-
-
-
-
-function finishWorkout() {
+function hasUnsavedChanges() {
 
     if (!activeWorkout) {
-        alert("No active workout.");
-        return;
+        return false;
     }
 
-    const confirmed =
-        confirm(
-            "Finish this workout?\n\nYour completed workout will be saved."
-        );
+    const savedExercises =
+        activeWorkout.exercises || [];
 
-    if (!confirmed) {
+    const dayIndex =
+        activeWorkout.dayIndex;
+
+    const workout =
+        workouts[dayIndex];
+
+    for (
+        let exerciseIndex = 0;
+        exerciseIndex < workout.exercises.length;
+        exerciseIndex++
+    ) {
+
+        const exercise =
+            workout.exercises[exerciseIndex];
+
+        const weightInput =
+            document.getElementById(
+                `weight-${dayIndex}-${exerciseIndex}`
+            );
+
+        if (!weightInput) {
+            continue;
+        }
+
+        const savedExercise =
+            savedExercises.find(
+                saved =>
+                    saved.exerciseName ===
+                    exercise.name
+            );
+
+        // Exercise has never been saved
+        if (!savedExercise) {
+            return true;
+        }
+
+        // Weight changed
+        if (
+            weightInput.value !==
+            (savedExercise.weight || "")
+        ) {
+            return true;
+        }
+
+        // Check reps
+        for (
+            let i = 0;
+            i < exercise.sets;
+            i++
+        ) {
+
+            const repsInput =
+                document.getElementById(
+                    `reps-${dayIndex}-${exerciseIndex}-${i}`
+                );
+
+            const currentReps =
+                repsInput
+                    ? repsInput.value
+                    : "";
+
+            const savedReps =
+                savedExercise.sets?.[i]?.reps || "";
+
+            if (
+                currentReps !==
+                savedReps
+            ) {
+                return true;
+            }
+        }
+    }
+
+    return false;
+}
+
+
+function saveAllExercises() {
+
+    if (!activeWorkout) {
         return;
     }
 
@@ -497,10 +964,8 @@ function finishWorkout() {
     const workout =
         workouts[dayIndex];
 
-    const completedAt =
-        new Date().toISOString();
-
-    const exercises = [];
+    activeWorkout.exercises =
+        activeWorkout.exercises || [];
 
     workout.exercises.forEach(
         (exercise, exerciseIndex) => {
@@ -510,9 +975,15 @@ function finishWorkout() {
                     `weight-${dayIndex}-${exerciseIndex}`
                 );
 
-            if (!weightInput) {
-                return;
-            }
+            const commentInput =
+                document.getElementById(
+                    `comment-${dayIndex}-${exerciseIndex}`
+                );
+
+            const weight =
+                weightInput
+                    ? weightInput.value
+                    : "";
 
             const sets = [];
 
@@ -534,19 +1005,76 @@ function finishWorkout() {
                 });
             }
 
-            exercises.push({
+            const savedExercise = {
 
                 exerciseName:
                     exercise.name,
 
                 weight:
-                    weightInput.value,
+                    weight,
 
                 sets:
-                    sets
-            });
+                    sets,
+
+                comment:
+                    commentInput
+                        ? commentInput.value
+                        : ""
+            };
+
+            const existingIndex =
+                activeWorkout.exercises.findIndex(
+                    saved =>
+                        saved.exerciseName ===
+                        exercise.name
+                );
+
+            if (existingIndex !== -1) {
+
+                activeWorkout.exercises[
+                    existingIndex
+                ] = savedExercise;
+
+            } else {
+
+                activeWorkout.exercises.push(
+                    savedExercise
+                );
+            }
         }
     );
+
+    localStorage.setItem(
+        "active-workout",
+        JSON.stringify(activeWorkout)
+    );
+}
+
+function finishWorkout() {
+
+    if (!activeWorkout) {
+        alert("No active workout.");
+        return;
+    }
+
+    const confirmed =
+        confirm(
+            "Finish this workout?\n\n" +
+            "All current exercise entries will be saved."
+        );
+
+    if (!confirmed) {
+        return;
+    }
+
+    // Save all current entries first
+    saveAllExercises();
+
+    const completedAt =
+        new Date().toISOString();
+
+    const workout =
+        workouts[activeWorkout.dayIndex];
 
     const session = {
 
@@ -554,7 +1082,7 @@ function finishWorkout() {
             activeWorkout.sessionId,
 
         dayIndex:
-            dayIndex,
+            activeWorkout.dayIndex,
 
         dayName:
             workout.name,
@@ -566,7 +1094,8 @@ function finishWorkout() {
             completedAt,
 
         exercises:
-            exercises
+            activeWorkout.exercises || []
+
     };
 
     const savedSessions =
@@ -586,9 +1115,9 @@ function finishWorkout() {
         JSON.stringify(sessions)
     );
 
-    console.log(
-        "Workout session saved:",
-        session
+    // Remove active workout
+    localStorage.removeItem(
+        "active-workout"
     );
 
     activeWorkout = null;
@@ -599,14 +1128,11 @@ function finishWorkout() {
 
     workoutContainer.innerHTML = "";
 
-    daySelection.style.display = "block";
+    daySelection.style.display =
+        "block";
 }
 
 function resetSession() {
-
-    if (!activeWorkout) {
-        return;
-    }
 
     const confirmed =
         confirm(
@@ -617,11 +1143,22 @@ function resetSession() {
         return;
     }
 
+    // Remove the persistent active workout
+    localStorage.removeItem("active-workout");
+
+    // Remove the in-memory active workout
     activeWorkout = null;
 
+    // Clear the workout screen
     workoutContainer.innerHTML = "";
 
+    // Return to day selection
     daySelection.style.display = "block";
+
+    console.log(
+        "Active workout after reset:",
+        localStorage.getItem("active-workout")
+    );
 }
 
 
@@ -945,8 +1482,24 @@ function showHistoryPage() {
                     </div>
             `;
 
-            session.exercises.forEach(
-                exercise => {
+            /*
+             * Use the workout plan order
+             * rather than the order in which
+             * exercises were saved.
+             */
+            workouts[session.dayIndex].exercises.forEach(
+                plannedExercise => {
+
+                    const exercise =
+                        session.exercises.find(
+                            savedExercise =>
+                                savedExercise.exerciseName ===
+                                plannedExercise.name
+                        );
+
+                    if (!exercise) {
+                        return;
+                    }
 
                     const reps =
                         exercise.sets
@@ -954,6 +1507,9 @@ function showHistoryPage() {
                                 set => set.reps
                             )
                             .join(" / ");
+
+                    const comment =
+                        exercise.comment || "";
 
                     html += `
 
@@ -970,6 +1526,16 @@ function showHistoryPage() {
                             <span>
                                 ${reps}
                             </span>
+
+                            ${
+                                comment
+                                    ? `
+                                        <div class="history-comment">
+                                            ${comment}
+                                        </div>
+                                    `
+                                    : ""
+                            }
 
                         </div>
                     `;
@@ -1069,7 +1635,9 @@ if ("serviceWorker" in navigator) {
 function exportWorkoutHistory() {
 
     const savedSessions =
-        localStorage.getItem("workout-sessions");
+        localStorage.getItem(
+            "workout-sessions"
+        );
 
     const sessions =
         savedSessions
@@ -1077,7 +1645,11 @@ function exportWorkoutHistory() {
             : [];
 
     if (sessions.length === 0) {
-        alert("There is no workout history to export.");
+
+        alert(
+            "There is no workout history to export."
+        );
+
         return;
     }
 
@@ -1093,54 +1665,68 @@ function exportWorkoutHistory() {
         "Set 3",
         "Set 4",
         "Set 5",
-        "Set 6"
+        "Set 6",
+        "Comment"
     ]);
 
-    sessions.forEach(session => {
+    sessions.forEach(
+        session => {
 
-        const workoutDate =
-            new Date(
-                session.completedAt
-            ).toLocaleDateString("en-GB");
-
-        session.exercises.forEach(exercise => {
-
-            const reps =
-                exercise.sets.map(
-                    set => set.reps
+            const workoutDate =
+                new Date(
+                    session.completedAt
+                ).toLocaleDateString(
+                    "en-GB"
                 );
 
-            rows.push([
-                workoutDate,
-                session.dayName,
-                exercise.exerciseName,
-                exercise.weight || "",
-                reps[0] || "",
-                reps[1] || "",
-                reps[2] || "",
-                reps[3] || "",
-                reps[4] || "",
-                reps[5] || ""
-            ]);
+            session.exercises.forEach(
+                exercise => {
 
-        });
+                    const reps =
+                        exercise.sets.map(
+                            set => set.reps
+                        );
 
-    });
+                    rows.push([
+                        workoutDate,
+                        session.dayName,
+                        exercise.exerciseName,
+                        exercise.weight || "",
+                        reps[0] || "",
+                        reps[1] || "",
+                        reps[2] || "",
+                        reps[3] || "",
+                        reps[4] || "",
+                        reps[5] || "",
+                        exercise.comment || ""
+                    ]);
+
+                }
+            );
+        }
+    );
 
     const csv =
         rows
-            .map(row =>
-                row.map(value => {
+            .map(
+                row =>
+                    row
+                        .map(
+                            value => {
 
-                    const text =
-                        String(value ?? "");
+                                const text =
+                                    String(
+                                        value ?? ""
+                                    );
 
-                    return `"${text.replace(
-                        /"/g,
-                        '""'
-                    )}"`;
+                                return `"${text.replace(
+                                    /"/g,
+                                    '""'
+                                )}"`;
 
-                }).join(",")
+                            }
+                        )
+                        .join(",")
             )
             .join("\n");
 
@@ -1148,7 +1734,8 @@ function exportWorkoutHistory() {
         new Blob(
             [csv],
             {
-                type: "text/csv;charset=utf-8;"
+                type:
+                    "text/csv;charset=utf-8;"
             }
         );
 
