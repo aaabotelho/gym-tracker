@@ -465,3 +465,20 @@ input[type="file"] {
     color: #192743;
 }
 
+#workout-history button {
+    margin-bottom: 10px;
+}
+
+#workout-history button:last-child {
+    margin-bottom: 0;
+}
+
+.secondary-button {
+    background: #e5e7eb;
+    color: #17181a;
+    margin-top: 10px;
+}
+
+.secondary-button:active {
+    background: #d1d5db;
+}

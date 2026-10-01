@@ -144,13 +144,21 @@ function displayWorkout(dayIndex) {
 
     html += `
 
-        <button
-            type="button"
-            onclick="finishWorkout()"
-        >
-            Finish Workout
-        </button>
-    `;
+    <button
+        type="button"
+        onclick="finishWorkout()"
+    >
+        Finish Workout
+    </button>
+
+    <button
+        type="button"
+        class="secondary-button"
+        onclick="resetSession()"
+    >
+        Reset Session
+    </button>
+`;
 
     workoutContainer.innerHTML = html;
 }
@@ -594,7 +602,27 @@ function finishWorkout() {
     daySelection.style.display = "block";
 }
 
+function resetSession() {
 
+    if (!activeWorkout) {
+        return;
+    }
+
+    const confirmed =
+        confirm(
+            "Reset this workout?\n\nYour current entries will be discarded. Your workout history will not be affected."
+        );
+
+    if (!confirmed) {
+        return;
+    }
+
+    activeWorkout = null;
+
+    workoutContainer.innerHTML = "";
+
+    daySelection.style.display = "block";
+}
 
 
 
@@ -1036,4 +1064,112 @@ if ("serviceWorker" in navigator) {
 
     });
 
+}
+
+function exportWorkoutHistory() {
+
+    const savedSessions =
+        localStorage.getItem("workout-sessions");
+
+    const sessions =
+        savedSessions
+            ? JSON.parse(savedSessions)
+            : [];
+
+    if (sessions.length === 0) {
+        alert("There is no workout history to export.");
+        return;
+    }
+
+    const rows = [];
+
+    rows.push([
+        "Workout Date",
+        "Day",
+        "Exercise",
+        "Weight (kg)",
+        "Set 1",
+        "Set 2",
+        "Set 3",
+        "Set 4",
+        "Set 5",
+        "Set 6"
+    ]);
+
+    sessions.forEach(session => {
+
+        const workoutDate =
+            new Date(
+                session.completedAt
+            ).toLocaleDateString("en-GB");
+
+        session.exercises.forEach(exercise => {
+
+            const reps =
+                exercise.sets.map(
+                    set => set.reps
+                );
+
+            rows.push([
+                workoutDate,
+                session.dayName,
+                exercise.exerciseName,
+                exercise.weight || "",
+                reps[0] || "",
+                reps[1] || "",
+                reps[2] || "",
+                reps[3] || "",
+                reps[4] || "",
+                reps[5] || ""
+            ]);
+
+        });
+
+    });
+
+    const csv =
+        rows
+            .map(row =>
+                row.map(value => {
+
+                    const text =
+                        String(value ?? "");
+
+                    return `"${text.replace(
+                        /"/g,
+                        '""'
+                    )}"`;
+
+                }).join(",")
+            )
+            .join("\n");
+
+    const blob =
+        new Blob(
+            [csv],
+            {
+                type: "text/csv;charset=utf-8;"
+            }
+        );
+
+    const url =
+        URL.createObjectURL(blob);
+
+    const link =
+        document.createElement("a");
+
+    link.href = url;
+
+    link.download =
+        `gym-tracker-history-${new Date()
+            .toISOString()
+            .slice(0, 10)}.csv`;
+
+    document.body.appendChild(link);
+
+    link.click();
+
+    document.body.removeChild(link);
+
+    URL.revokeObjectURL(url);
 }
