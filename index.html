@@ -1,100 +1,183 @@
-
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
+
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    >
 
     <title>Gym Tracker</title>
 
-    <link rel="stylesheet" href="style.css">
-    <link rel="manifest" href="manifest.json">
-    <meta name="theme-color" content="#192743">
-    <meta name="mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black">
+    <link
+        rel="stylesheet"
+        href="style.css"
+    >
+
+    <link
+        rel="manifest"
+        href="manifest.json"
+    >
+
+    <meta
+        name="theme-color"
+        content="#192743"
+    >
+
+    <meta
+        name="mobile-web-app-capable"
+        content="yes"
+    >
+
+    <meta
+        name="apple-mobile-web-app-capable"
+        content="yes"
+    >
+
+    <meta
+        name="apple-mobile-web-app-status-bar-style"
+        content="black"
+    >
+
 </head>
+
 
 <body>
 
     <div class="app">
 
         <header>
-            <h1>Gym Tracker</h1>
+
+            <h1>
+                Gym Tracker
+            </h1>
+
         </header>
 
+
         <main>
-        
-            <section id="day-selection">
-        
-                <h2>Select Workout</h2>
-        
-                <div id="day-buttons"></div>
-        
-                <section id="workout-history">
-        
-                    <h3>History</h3>
-        
-                    <button
-                        type="button"
-                        onclick="showHistoryPage()"
-                    >
-                        View Workout History
-                    </button>
-                    
-                    <button
-                        type="button"
-                        onclick="exportWorkoutHistory()"
-                        >
-                        Export Workout History
-                    </button>
-        
+
+
+            <!-- =========================
+                 WORKOUT SELECTION
+                 ========================= -->
+
+                 <section id="day-selection">
+
+                    <h2>Select Workout</h2>
+                
+                    <div id="day-buttons"></div>
+                
                 </section>
-        
-                <section id="plan-import">
-        
-                    <h3>Workout Plan</h3>
-        
-                    <input
-                        type="file"
-                        id="plan-file"
-                        accept=".csv"
-                    >
-        
+                
+                
+                <section id="measurements-section">
+                
+                    <h3>
+                        Measurements
+                    </h3>
+                
                     <button
                         type="button"
-                        onclick="importPlan()"
+                        onclick="showMeasurementsPage()"
                     >
-                        Import Workout Plan
+                        Measurements
                     </button>
-        
+                
                 </section>
-        
-                <section id="reset-data">
-        
-                    <h3>Data</h3>
-        
-                    <button
-                        type="button"
-                        onclick="resetWorkoutData()"
-                    >
-                        Reset Workout Data
-                    </button>
-        
-                </section>
-        
+
+
+            <!-- =========================
+                 WORKOUT HISTORY
+                 ========================= -->
+
+            <section id="workout-history">
+
+                <h3>
+                    History
+                </h3>
+
+                <button
+                    type="button"
+                    onclick="showHistoryPage()"
+                >
+                    View Workout History
+                </button>
+
+                <button
+                    type="button"
+                    onclick="exportWorkoutHistory()"
+                >
+                    Export Workout History
+                </button>
+
             </section>
-        
+
+
+            <!-- =========================
+                 WORKOUT PLAN
+                 ========================= -->
+
+            <section id="plan-import">
+
+                <h3>
+                    Workout Plan
+                </h3>
+
+                <input
+                    type="file"
+                    id="plan-file"
+                    accept=".csv"
+                >
+
+                <button
+                    type="button"
+                    onclick="importPlan()"
+                >
+                    Import Workout Plan
+                </button>
+
+            </section>
+
+
+            <!-- =========================
+                 DATA
+                 ========================= -->
+
+            <section id="reset-data">
+
+                <h3>
+                    Data
+                </h3>
+
+                <button
+                    type="button"
+                    onclick="resetWorkoutData()"
+                >
+                    Reset Workout Data
+                </button>
+
+            </section>
+
+
+            <!-- =========================
+                 DYNAMIC CONTENT
+                 ========================= -->
+
             <div id="workout"></div>
-        
+
+
         </main>
-        
-        
+
 
     </div>
+
 
     <script src="app.js"></script>
 
 </body>
-</html>
 
+</html>

@@ -1,4 +1,4 @@
-console.log("GYM TRACKER APP JS - VERSION 20");
+console.log("GYM TRACKER APP JS - VERSION 26");
 
 let workouts = [];
 let activeWorkout = null;
@@ -80,7 +80,7 @@ function selectDay(dayIndex) {
     }
 
     // No active workout → create a new one
-    daySelection.style.display = "none";
+    hideHomeSections();
 
     activeWorkout = {
 
@@ -98,6 +98,8 @@ function selectDay(dayIndex) {
 }
 
 function showWorkoutStart(dayIndex) {
+
+    hideHomeSections();
 
     const workout =
         workouts[dayIndex];
@@ -127,6 +129,8 @@ function showWorkoutStart(dayIndex) {
 }
 
 function startWorkout() {
+
+    hideHomeSections();
 
     if (!activeWorkout) {
         return;
@@ -179,12 +183,14 @@ function restoreActiveWorkout() {
             activeWorkout.sessionId &&
             activeWorkout.dayIndex !== undefined
         ) {
+
+            hideHomeSections();
+            
             displayWorkout(
                 activeWorkout.dayIndex
             );
 
-            daySelection.style.display =
-                "none";
+            
 
             return true;
         }
@@ -1235,7 +1241,7 @@ function goBack() {
 
     workoutContainer.innerHTML = "";
 
-    daySelection.style.display = "block";
+    showHomeSections();
 }
 
 function importPlan() {
@@ -1579,7 +1585,7 @@ function resetWorkoutData() {
 
     const confirmed =
         confirm(
-            "This will delete all saved workout history and the current workout plan.\n\nAre you sure?"
+            "This will delete all saved workout history, measurements, current workout data, and the current workout plan.\n\nAre you sure?"
         );
 
     if (!confirmed) {
@@ -1591,9 +1597,19 @@ function resetWorkoutData() {
         "workout-plan"
     );
 
-    // Remove new workout sessions
+    // Remove completed workout sessions
     localStorage.removeItem(
         "workout-sessions"
+    );
+
+    // Remove active workout
+    localStorage.removeItem(
+        "active-workout"
+    );
+
+    // Remove measurements
+    localStorage.removeItem(
+        "body-measurements"
     );
 
     // Remove old exercise history
@@ -1619,30 +1635,10 @@ function resetWorkoutData() {
     activeWorkout = null;
 
     alert(
-        "Workout data has been reset."
+        "All workout and measurement data has been reset."
     );
 
     location.reload();
-}
-
-if ("serviceWorker" in navigator) {
-
-    window.addEventListener("load", () => {
-
-        navigator.serviceWorker
-            .register("./sw.js")
-            .then(() => {
-                console.log("Service worker registered.");
-            })
-            .catch(error => {
-                console.error(
-                    "Service worker registration failed:",
-                    error
-                );
-            });
-
-    });
-
 }
 
 function getWeightValues() {
@@ -1679,6 +1675,563 @@ function getWeightValues() {
     return values;
 }
 
+function getMeasurementValues(
+    type
+) {
+
+    const values = [];
+
+    let min = 0;
+    let max = 0;
+    let step = 0.5;
+
+    if (type === "weight") {
+
+        return getWeightValues();
+    }
+
+    if (type === "pectoral") {
+
+        min = 50;
+        max = 150;
+
+    } else if (type === "abdomen") {
+
+        min = 50;
+        max = 150;
+
+    } else if (type === "bicep") {
+
+        min = 20;
+        max = 60;
+
+    } else if (type === "leg") {
+
+        min = 30;
+        max = 90;
+    }
+
+    for (
+        let value = min;
+        value <= max;
+        value += step
+    ) {
+
+        values.push(
+            Number(
+                value.toFixed(1)
+            )
+        );
+    }
+
+    return values;
+}
+
+
+function openMeasurementWeightPicker(
+    type,
+    inputId
+) {
+
+    const input =
+        document.getElementById(inputId);
+
+    if (!input) {
+        return;
+    }
+
+    const values =
+        getMeasurementWeightValues(type);
+
+    const currentValue =
+        input.value !== ""
+            ? Number(input.value)
+            : values[0];
+
+    let selectedIndex =
+        values.findIndex(
+            value =>
+                value === currentValue
+        );
+
+    if (selectedIndex === -1) {
+        selectedIndex = 0;
+    }
+
+    const title =
+        type === "units"
+            ? "Weight"
+            : "Decimal";
+
+    const unit =
+        type === "units"
+            ? " kg"
+            : "";
+
+    let html = `
+        <div
+            class="number-picker-overlay"
+            onclick="closeNumberPicker(event)"
+        >
+            <div
+                class="number-picker"
+                onclick="event.stopPropagation()"
+            >
+
+                <h3>${title}</h3>
+
+                <div
+                    class="number-picker-list"
+                    id="number-picker-list"
+                >
+    `;
+
+    values.forEach(
+        (value, index) => {
+
+            html += `
+                <button
+                    type="button"
+                    class="number-picker-option ${
+                        index === selectedIndex
+                            ? "selected"
+                            : ""
+                    }"
+                    data-index="${index}"
+                >
+                    ${value}${unit}
+                </button>
+            `;
+        }
+    );
+
+    html += `
+                </div>
+
+                <div
+                    class="number-picker-actions"
+                >
+
+                    <button
+                        type="button"
+                        onclick="cancelNumberPicker()"
+                    >
+                        Cancel
+                    </button>
+
+                    <button
+                        type="button"
+                        class="picker-done"
+                        onclick="confirmMeasurementWeightPicker()"
+                    >
+                        Done
+                    </button>
+
+                </div>
+
+            </div>
+        </div>
+    `;
+
+    const picker =
+        document.createElement("div");
+
+    picker.id =
+        "number-picker-container";
+
+    picker.dataset.inputId =
+        inputId;
+
+    picker.dataset.type =
+        type;
+
+    picker.dataset.selectedIndex =
+        selectedIndex;
+
+    picker.innerHTML =
+        html;
+
+    document.body.appendChild(
+        picker
+    );
+
+    const list =
+        picker.querySelector(
+            "#number-picker-list"
+        );
+
+    const selected =
+        list.querySelector(
+            ".number-picker-option.selected"
+        );
+
+    if (selected) {
+
+        list.scrollTop =
+            selected.offsetTop -
+            list.clientHeight / 2 +
+            selected.offsetHeight / 2;
+    }
+
+    let scrollTimeout;
+
+    list.addEventListener(
+        "scroll",
+        () => {
+
+            clearTimeout(
+                scrollTimeout
+            );
+
+            updatePickerSelection(
+                list
+            );
+
+            scrollTimeout =
+                setTimeout(
+                    () => {
+
+                        const selected =
+                            list.querySelector(
+                                ".number-picker-option.selected"
+                            );
+
+                        if (!selected) {
+                            return;
+                        }
+
+                        selected.scrollIntoView({
+                            behavior: "smooth",
+                            block: "center"
+                        });
+
+                    },
+                    120
+                );
+        }
+    );
+}
+
+
+function confirmMeasurementWeightPicker() {
+
+    const picker =
+        document.getElementById(
+            "number-picker-container"
+        );
+
+    if (!picker) {
+        return;
+    }
+
+    const input =
+        document.getElementById(
+            picker.dataset.inputId
+        );
+
+    if (!input) {
+        picker.remove();
+        return;
+    }
+
+    const type =
+        picker.dataset.type;
+
+    const values =
+        getMeasurementWeightValues(
+            type
+        );
+
+    const selectedIndex =
+        Number(
+            picker.dataset.selectedIndex
+        );
+
+    const value =
+        values[selectedIndex];
+
+    if (value !== undefined) {
+
+        input.value =
+            value;
+    }
+
+    picker.remove();
+}
+
+
+function getMeasurementWeightValues(
+    type
+) {
+
+    const values = [];
+
+    if (type === "units") {
+
+        for (
+            let value = 70;
+            value <= 90;
+            value++
+        ) {
+            values.push(value);
+        }
+
+    } else {
+
+        for (
+            let value = 0;
+            value <= 9;
+            value++
+        ) {
+            values.push(value);
+        }
+    }
+
+    return values;
+}
+
+function openMeasurementPicker(
+    type,
+    inputId
+) {
+
+    const input =
+        document.getElementById(
+            inputId
+        );
+
+    if (!input) {
+        return;
+    }
+
+    const values =
+        getMeasurementValues(type);
+
+    const currentValue =
+        input.value !== ""
+            ? Number(input.value)
+            : values[0];
+
+    let selectedIndex =
+        values.findIndex(
+            value =>
+                value === currentValue
+        );
+
+    if (selectedIndex === -1) {
+        selectedIndex = 0;
+    }
+
+    const titles = {
+
+        weight: "Weight",
+
+        pectoral: "Pectoral",
+
+        abdomen: "Abdomen",
+
+        bicep: "Bicep",
+
+        leg: "Leg / Thigh"
+    };
+
+    const title =
+        titles[type] || "Measurement";
+
+    let html = `
+
+        <div
+            class="number-picker-overlay"
+            onclick="closeNumberPicker(event)"
+        >
+
+            <div
+                class="number-picker"
+                onclick="event.stopPropagation()"
+            >
+
+                <h3>
+                    ${title}
+                </h3>
+
+                <div
+                    class="number-picker-list"
+                    id="number-picker-list"
+                >
+    `;
+
+    values.forEach(
+        (value, index) => {
+
+            html += `
+
+                <button
+                    type="button"
+                    class="number-picker-option ${
+                        index === selectedIndex
+                            ? "selected"
+                            : ""
+                    }"
+                    data-index="${index}"
+                >
+                    ${value}
+                </button>
+            `;
+        }
+    );
+
+    html += `
+
+                </div>
+
+                <div
+                    class="number-picker-actions"
+                >
+
+                    <button
+                        type="button"
+                        onclick="cancelNumberPicker()"
+                    >
+                        Cancel
+                    </button>
+
+                    <button
+                        type="button"
+                        class="picker-done"
+                        onclick="confirmMeasurementPicker()"
+                    >
+                        Done
+                    </button>
+
+                </div>
+
+            </div>
+
+        </div>
+    `;
+
+    const picker =
+        document.createElement("div");
+
+    picker.id =
+        "number-picker-container";
+
+    picker.dataset.inputId =
+        inputId;
+
+    picker.dataset.type =
+        type;
+
+    picker.dataset.selectedIndex =
+        selectedIndex;
+
+    picker.innerHTML =
+        html;
+
+    document.body.appendChild(
+        picker
+    );
+
+    const list =
+        picker.querySelector(
+            "#number-picker-list"
+        );
+
+    const selected =
+        list.querySelector(
+            ".number-picker-option.selected"
+        );
+
+    if (selected) {
+
+        list.scrollTop =
+            selected.offsetTop -
+            list.clientHeight / 2 +
+            selected.offsetHeight / 2;
+    }
+
+    let scrollTimeout;
+
+    list.addEventListener(
+        "scroll",
+        () => {
+
+            clearTimeout(
+                scrollTimeout
+            );
+
+            updatePickerSelection(
+                list
+            );
+
+            scrollTimeout =
+                setTimeout(
+                    () => {
+
+                        const selected =
+                            list.querySelector(
+                                ".number-picker-option.selected"
+                            );
+
+                        if (!selected) {
+                            return;
+                        }
+
+                        selected.scrollIntoView({
+                            behavior: "smooth",
+                            block: "center"
+                        });
+
+                    },
+                    120
+                );
+        }
+    );
+}
+
+function confirmMeasurementPicker() {
+
+    const picker =
+        document.getElementById(
+            "number-picker-container"
+        );
+
+    if (!picker) {
+        return;
+    }
+
+    const input =
+        document.getElementById(
+            picker.dataset.inputId
+        );
+
+    if (!input) {
+        picker.remove();
+        return;
+    }
+
+    const type =
+        picker.dataset.type;
+
+    const values =
+        getMeasurementValues(type);
+
+    const selectedIndex =
+        Number(
+            picker.dataset.selectedIndex
+        );
+
+    const value =
+        values[selectedIndex];
+
+    if (value !== undefined) {
+
+        input.value =
+            value;
+    }
+
+    picker.remove();
+}
 
 function getRepValues() {
 
@@ -2249,4 +2802,922 @@ function exportWorkoutHistory() {
     document.body.removeChild(link);
 
     URL.revokeObjectURL(url);
+}
+
+function showMeasurementsPage() {
+
+
+    hideHomeSections();
+
+    const savedMeasurements =
+        localStorage.getItem(
+            "body-measurements"
+        );
+
+    const measurements =
+        savedMeasurements
+            ? JSON.parse(savedMeasurements)
+            : [];
+
+    const sortedMeasurements =
+        [...measurements].sort(
+            (a, b) =>
+                new Date(b.date) -
+                new Date(a.date)
+        );
+
+    const latestMeasurement =
+        sortedMeasurements.length > 0
+            ? sortedMeasurements[0]
+            : null;
+
+    let html = `
+
+        <button
+            type="button"
+            onclick="goBackFromMeasurements()"
+        >
+            ← Back
+        </button>
+
+        <h2>Measurements</h2>
+    `;
+
+    /*
+     * Latest measurements
+     */
+    if (latestMeasurement) {
+
+        html += `
+
+            <div class="latest-measurements">
+
+                <h3>
+                    Latest
+                </h3>
+
+                <div class="measurement-date">
+                    ${formatDate(
+                        latestMeasurement.date
+                    )}
+                </div>
+
+                <div class="measurement-summary">
+
+                    <div class="measurement-summary-row">
+                        <span>Weight</span>
+                        <strong>
+                            ${latestMeasurement.weight || "-"} kg
+                        </strong>
+                    </div>
+
+                    <div class="measurement-summary-row">
+                        <span>Pectoral</span>
+                        <strong>
+                            ${latestMeasurement.pectoral || "-"} cm
+                        </strong>
+                    </div>
+
+                    <div class="measurement-summary-row">
+                        <span>Abdomen</span>
+                        <strong>
+                            ${latestMeasurement.abdomen || "-"} cm
+                        </strong>
+                    </div>
+
+                    <div class="measurement-summary-row">
+                        <span>Bicep</span>
+                        <strong>
+                            ${latestMeasurement.bicep || "-"} cm
+                        </strong>
+                    </div>
+
+                    <div class="measurement-summary-row">
+                        <span>Leg / Thigh</span>
+                        <strong>
+                            ${latestMeasurement.leg || "-"} cm
+                        </strong>
+                    </div>
+
+                </div>
+
+            </div>
+        `;
+    }
+
+    /*
+     * New measurement form
+     */
+    html += `
+
+        <h3>
+            New Measurement
+        </h3>
+
+        <div class="measurements-form">
+
+            <div class="measurement-weight-row">
+
+    <label>
+        Weight (kg)
+    </label>
+
+    <div class="measurement-weight-pickers">
+
+        <input
+            type="text"
+            readonly
+            class="number-picker-input"
+            id="measurement-weight-units"
+            placeholder="kg"
+            value="${
+                latestMeasurement?.weight
+                    ? Math.floor(
+                        Number(
+                            latestMeasurement.weight
+                        )
+                    )
+                    : ""
+            }"
+            onclick="openMeasurementWeightPicker(
+                'units',
+                'measurement-weight-units'
+            )"
+        >
+
+        <span class="measurement-weight-dot">
+            .
+        </span>
+
+        <input
+            type="text"
+            readonly
+            class="number-picker-input"
+            id="measurement-weight-decimal"
+            placeholder="0"
+            value="${
+                latestMeasurement?.weight
+                    ? Math.round(
+                        (
+                            Number(
+                                latestMeasurement.weight
+                            ) % 1
+                        ) * 10
+                    )
+                    : ""
+            }"
+            onclick="openMeasurementWeightPicker(
+                'decimal',
+                'measurement-weight-decimal'
+            )"
+        >
+
+    </div>
+
+</div>
+
+            <label>
+                Pectoral (cm)
+            </label>
+
+            <input
+                type="text"
+                readonly
+                class="number-picker-input"
+                id="measurement-pectoral"
+                placeholder="Select cm"
+                value="${
+                    latestMeasurement?.pectoral || ""
+                }"
+                onclick="openMeasurementPicker(
+                    'pectoral',
+                    'measurement-pectoral'
+                )"
+            >
+
+            <label>
+                Abdomen (cm)
+            </label>
+
+            <input
+                type="text"
+                readonly
+                class="number-picker-input"
+                id="measurement-abdomen"
+                placeholder="Select cm"
+                value="${
+                    latestMeasurement?.abdomen || ""
+                }"
+                onclick="openMeasurementPicker(
+                    'abdomen',
+                    'measurement-abdomen'
+                )"
+            >
+
+            <label>
+                Bicep (cm)
+            </label>
+
+            <input
+                type="text"
+                readonly
+                class="number-picker-input"
+                id="measurement-bicep"
+                placeholder="Select cm"
+                value="${
+                    latestMeasurement?.bicep || ""
+                }"
+                onclick="openMeasurementPicker(
+                    'bicep',
+                    'measurement-bicep'
+                )"
+            >
+
+            <label>
+                Leg / Thigh (cm)
+            </label>
+
+            <input
+                type="text"
+                readonly
+                class="number-picker-input"
+                id="measurement-leg"
+                placeholder="Select cm"
+                value="${
+                    latestMeasurement?.leg || ""
+                }"
+                onclick="openMeasurementPicker(
+                    'leg',
+                    'measurement-leg'
+                )"
+            >
+
+            <button
+                type="button"
+                onclick="saveMeasurements()"
+            >
+                Save Measurements
+            </button>
+
+        </div>
+        
+        <h3>
+    Progress
+</h3>
+
+<div class="progress-chart-container">
+
+    <select
+        id="measurement-chart-select"
+        onchange="drawMeasurementChart()"
+    >
+
+        <option value="weight">
+            Weight
+        </option>
+
+        <option value="pectoral">
+            Pectoral
+        </option>
+
+        <option value="abdomen">
+            Abdomen
+        </option>
+
+        <option value="bicep">
+            Bicep
+        </option>
+
+        <option value="leg">
+            Leg / Thigh
+        </option>
+
+    </select>
+
+    <canvas
+        id="measurement-chart"
+    ></canvas>
+
+</div>
+
+        <h3>
+            Measurement History
+        </h3>
+    `;
+
+    /*
+     * Historical measurements
+     */
+    if (sortedMeasurements.length === 0) {
+
+        html += `
+
+            <div class="previous">
+                No measurements recorded yet.
+            </div>
+        `;
+
+    } else {
+
+        sortedMeasurements.forEach(
+            (measurement, index) => {
+
+                html += `
+
+                    <div class="measurement-history">
+
+                        <div class="measurement-history-header">
+
+                            <strong>
+                                ${formatDate(
+                                    measurement.date
+                                )}
+                            </strong>
+
+                        </div>
+
+                        <div class="measurement-history-grid">
+
+                            <div>
+                                <span>Weight</span>
+                                <strong>
+                                    ${measurement.weight || "-"} kg
+                                </strong>
+                            </div>
+
+                            <div>
+                                <span>Pectoral</span>
+                                <strong>
+                                    ${measurement.pectoral || "-"} cm
+                                </strong>
+                            </div>
+
+                            <div>
+                                <span>Abdomen</span>
+                                <strong>
+                                    ${measurement.abdomen || "-"} cm
+                                </strong>
+                            </div>
+
+                            <div>
+                                <span>Bicep</span>
+                                <strong>
+                                    ${measurement.bicep || "-"} cm
+                                </strong>
+                            </div>
+
+                            <div>
+                                <span>Leg / Thigh</span>
+                                <strong>
+                                    ${measurement.leg || "-"} cm
+                                </strong>
+                            </div>
+
+                        </div>
+
+                    </div>
+                `;
+            }
+        );
+    }
+
+    workoutContainer.innerHTML =
+        html;
+
+        drawMeasurementChart();
+}
+
+function getMeasurementWeightValues(type) {
+
+    const values = [];
+
+    if (type === "units") {
+
+        for (
+            let value = 70;
+            value <= 90;
+            value++
+        ) {
+            values.push(value);
+        }
+
+    } else {
+
+        for (
+            let value = 0;
+            value <= 9;
+            value++
+        ) {
+            values.push(value);
+        }
+    }
+
+    return values;
+}
+
+function saveMeasurements() {
+
+    const weightUnits =
+    document.getElementById(
+        "measurement-weight-units"
+    ).value;
+
+const weightDecimal =
+    document.getElementById(
+        "measurement-weight-decimal"
+    ).value;
+
+const weight =
+    weightUnits && weightDecimal !== ""
+        ? Number(
+            weightUnits +
+            "." +
+            weightDecimal
+        )
+        : "";
+
+    const pectoral =
+        document.getElementById(
+            "measurement-pectoral"
+        ).value;
+
+    const abdomen =
+        document.getElementById(
+            "measurement-abdomen"
+        ).value;
+
+    const bicep =
+        document.getElementById(
+            "measurement-bicep"
+        ).value;
+
+    const leg =
+        document.getElementById(
+            "measurement-leg"
+        ).value;
+
+    /*
+     * At least one measurement
+     * must be entered.
+     */
+    if (
+        !weight &&
+        !pectoral &&
+        !abdomen &&
+        !bicep &&
+        !leg
+    ) {
+
+        alert(
+            "Enter at least one measurement."
+        );
+
+        return;
+    }
+
+    const savedMeasurements =
+        localStorage.getItem(
+            "body-measurements"
+        );
+
+    const measurements =
+        savedMeasurements
+            ? JSON.parse(savedMeasurements)
+            : [];
+
+    const measurement = {
+
+        date:
+            new Date().toISOString(),
+
+        weight:
+            weight,
+
+        pectoral:
+            pectoral,
+
+        abdomen:
+            abdomen,
+
+        bicep:
+            bicep,
+
+        leg:
+            leg
+    };
+
+    measurements.push(
+        measurement
+    );
+
+    localStorage.setItem(
+        "body-measurements",
+        JSON.stringify(
+            measurements
+        )
+    );
+
+    alert(
+        "Measurements saved."
+    );
+
+    showMeasurementsPage();
+}
+
+function goBackFromMeasurements() {
+
+    workoutContainer.innerHTML = "";
+
+    showHomeSections();
+}
+
+function drawMeasurementChart() {
+
+    const canvas =
+        document.getElementById(
+            "measurement-chart"
+        );
+
+    const select =
+        document.getElementById(
+            "measurement-chart-select"
+        );
+
+    if (!canvas || !select) {
+        return;
+    }
+
+    const savedMeasurements =
+        localStorage.getItem(
+            "body-measurements"
+        );
+
+    const measurements =
+        savedMeasurements
+            ? JSON.parse(savedMeasurements)
+            : [];
+
+    const type =
+        select.value;
+
+    const labels = [];
+
+    const values = [];
+
+    measurements
+        .sort(
+            (a, b) =>
+                new Date(a.date) -
+                new Date(b.date)
+        )
+        .forEach(
+            measurement => {
+
+                const value =
+                    Number(
+                        measurement[type]
+                    );
+
+                if (
+                    !isNaN(value) &&
+                    value > 0
+                ) {
+
+                    labels.push(
+                        formatDate(
+                            measurement.date
+                        )
+                    );
+
+                    values.push(value);
+                }
+            }
+        );
+
+    const ctx =
+        canvas.getContext("2d");
+
+    /*
+     * Clear previous chart
+     */
+    ctx.clearRect(
+        0,
+        0,
+        canvas.width,
+        canvas.height
+    );
+
+    /*
+     * No data
+     */
+    if (values.length === 0) {
+
+        ctx.font =
+            "16px sans-serif";
+
+        ctx.textAlign =
+            "center";
+
+        ctx.fillStyle =
+            "#777";
+
+        ctx.fillText(
+            "No data available",
+            canvas.width / 2,
+            canvas.height / 2
+        );
+
+        return;
+    }
+
+    const width =
+        canvas.width;
+
+    const height =
+        canvas.height;
+
+    const padding = 40;
+
+    const chartWidth =
+        width - padding * 2;
+
+    const chartHeight =
+        height - padding * 2;
+
+    const minValue =
+        Math.min(...values);
+
+    const maxValue =
+        Math.max(...values);
+
+    /*
+     * Add some space above/below
+     * the actual values.
+     */
+    const range =
+        maxValue - minValue || 1;
+
+    const chartMin =
+        minValue - range * 0.1;
+
+    const chartMax =
+        maxValue + range * 0.1;
+
+    /*
+     * Draw horizontal guide lines
+     */
+    ctx.strokeStyle =
+        "#e5e7eb";
+
+    ctx.lineWidth = 1;
+
+    for (
+        let i = 0;
+        i <= 4;
+        i++
+    ) {
+
+        const y =
+            padding +
+            (chartHeight / 4) * i;
+
+        ctx.beginPath();
+
+        ctx.moveTo(
+            padding,
+            y
+        );
+
+        ctx.lineTo(
+            width - padding,
+            y
+        );
+
+        ctx.stroke();
+    }
+
+    /*
+     * Draw the line
+     */
+    ctx.beginPath();
+
+    values.forEach(
+        (value, index) => {
+
+            const x =
+                values.length === 1
+                    ? width / 2
+                    : padding +
+                      (
+                          chartWidth /
+                          (values.length - 1)
+                      ) *
+                      index;
+
+            const y =
+                padding +
+                chartHeight -
+                (
+                    (
+                        value -
+                        chartMin
+                    ) /
+                    (
+                        chartMax -
+                        chartMin
+                    )
+                ) *
+                chartHeight;
+
+            if (index === 0) {
+
+                ctx.moveTo(
+                    x,
+                    y
+                );
+
+            } else {
+
+                ctx.lineTo(
+                    x,
+                    y
+                );
+            }
+        }
+    );
+
+    ctx.strokeStyle =
+        "#192743";
+
+    ctx.lineWidth = 3;
+
+    ctx.stroke();
+
+    /*
+     * Draw data points
+     */
+    values.forEach(
+        (value, index) => {
+
+            const x =
+                values.length === 1
+                    ? width / 2
+                    : padding +
+                      (
+                          chartWidth /
+                          (values.length - 1)
+                      ) *
+                      index;
+
+            const y =
+                padding +
+                chartHeight -
+                (
+                    (
+                        value -
+                        chartMin
+                    ) /
+                    (
+                        chartMax -
+                        chartMin
+                    )
+                ) *
+                chartHeight;
+
+            ctx.beginPath();
+
+            ctx.arc(
+                x,
+                y,
+                5,
+                0,
+                Math.PI * 2
+            );
+
+            ctx.fillStyle =
+                "#192743";
+
+            ctx.fill();
+        }
+    );
+
+    /*
+     * Y-axis labels
+     */
+    ctx.fillStyle =
+        "#777";
+
+    ctx.font =
+        "12px sans-serif";
+
+    ctx.textAlign =
+        "right";
+
+    ctx.fillText(
+        chartMax.toFixed(1),
+        padding - 8,
+        padding + 4
+    );
+
+    ctx.fillText(
+        chartMin.toFixed(1),
+        padding - 8,
+        height - padding
+    );
+
+    /*
+     * X-axis labels
+     *
+     * Only show a few dates so
+     * the chart remains readable.
+     */
+    ctx.textAlign =
+        "center";
+
+    const maxLabels = 5;
+
+    const labelStep =
+        Math.max(
+            1,
+            Math.ceil(
+                labels.length /
+                maxLabels
+            )
+        );
+
+    labels.forEach(
+        (label, index) => {
+
+            if (
+                index % labelStep !== 0 &&
+                index !==
+                    labels.length - 1
+            ) {
+                return;
+            }
+
+            const x =
+                labels.length === 1
+                    ? width / 2
+                    : padding +
+                      (
+                          chartWidth /
+                          (labels.length - 1)
+                      ) *
+                      index;
+
+            ctx.fillText(
+                label,
+                x,
+                height - 12
+            );
+        }
+    );
+}
+
+function hideHomeSections() {
+
+    document.getElementById(
+        "day-selection"
+    ).style.display = "none";
+
+    document.getElementById(
+        "measurements-section"
+    ).style.display = "none";
+
+    document.getElementById(
+        "workout-history"
+    ).style.display = "none";
+
+    document.getElementById(
+        "plan-import"
+    ).style.display = "none";
+
+    document.getElementById(
+        "reset-data"
+    ).style.display = "none";
+}
+
+
+function showHomeSections() {
+
+    document.getElementById(
+        "day-selection"
+    ).style.display = "block";
+
+    document.getElementById(
+        "measurements-section"
+    ).style.display = "block";
+
+    document.getElementById(
+        "workout-history"
+    ).style.display = "block";
+
+    document.getElementById(
+        "plan-import"
+    ).style.display = "block";
+
+    document.getElementById(
+        "reset-data"
+    ).style.display = "block";
 }

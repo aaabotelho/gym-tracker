@@ -1,4 +1,4 @@
-const CACHE_NAME = "gym-tracker-v20";
+const CACHE_NAME = "gym-tracker-v26";
 
 const APP_FILES = [
     "./",
