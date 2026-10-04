@@ -1,4 +1,4 @@
-console.log("GYM TRACKER APP JS - VERSION 28");
+console.log("GYM TRACKER APP JS - VERSION 30");
 
 let workouts = [];
 let activeWorkout = null;
@@ -15,8 +15,6 @@ if (savedPlan) {
 const workoutContainer =
     document.getElementById("workout");
 
-const daySelection =
-    document.getElementById("day-selection");
 
 restoreActiveWorkout();
 
@@ -45,9 +43,6 @@ function selectDay(dayIndex) {
                 if (
                     activeWorkout.dayIndex === dayIndex
                 ) {
-
-                    daySelection.style.display =
-                        "none";
 
                     displayWorkout(
                         activeWorkout.dayIndex
@@ -103,6 +98,12 @@ function showWorkoutStart(dayIndex) {
 
     const workout =
         workouts[dayIndex];
+
+    if (!workout) {
+        showHomeSections();
+        return;
+    }
+
 
     workoutContainer.innerHTML = `
 
@@ -163,52 +164,98 @@ function startWorkout() {
 function restoreActiveWorkout() {
 
     const savedActiveWorkout =
-        localStorage.getItem(
-            "active-workout"
-        );
+        localStorage.getItem("active-workout");
 
     if (!savedActiveWorkout) {
         return false;
     }
 
+    // 1. Parse (only corrupted data is discarded here)
+    let parsed;
+
     try {
-
-        activeWorkout =
-            JSON.parse(
-                savedActiveWorkout
-            );
-
-        if (
-            activeWorkout &&
-            activeWorkout.sessionId &&
-            activeWorkout.dayIndex !== undefined
-        ) {
-
-            hideHomeSections();
-            
-            displayWorkout(
-                activeWorkout.dayIndex
-            );
-
-            
-
-            return true;
-        }
-
+        parsed = JSON.parse(savedActiveWorkout);
     } catch (error) {
-
         console.error(
             "Could not restore active workout:",
             error
         );
-
-        localStorage.removeItem(
-            "active-workout"
-        );
+        localStorage.removeItem("active-workout");
+        return false;
     }
 
-    return false;
+    if (
+        !parsed ||
+        !parsed.sessionId ||
+        parsed.dayIndex === undefined
+    ) {
+        return false;
+    }
+
+    // 2. The day must still exist in the current plan
+    if (!workouts[parsed.dayIndex]) {
+        console.warn(
+            "Active workout refers to a day that is not in the plan; discarding it."
+        );
+        localStorage.removeItem("active-workout");
+        alert(
+            "Your unfinished workout no longer matches the workout plan and was discarded."
+        );
+        return false;
+    }
+
+    // 3. Show it
+    activeWorkout = parsed;
+    displayWorkout(activeWorkout.dayIndex);
+
+    return true;
 }
+
+
+/*
+ * Exercises are identified by NAME + OCCURRENCE: the 2nd "Bench Press"
+ * of a day has occurrence 1. This keeps duplicates from overwriting
+ * each other. Entries saved before this change have no occurrence (= 0).
+ */
+function getOccurrence(dayIndex, exerciseIndex) {
+
+    const exercises = workouts[dayIndex].exercises;
+
+    const name = exercises[exerciseIndex].name;
+
+    return exercises
+        .slice(0, exerciseIndex)
+        .filter(exercise => exercise.name === name)
+        .length;
+}
+
+
+function findSavedExercise(savedExercises, name, occurrence = 0) {
+
+    return (savedExercises || []).find(
+        saved =>
+            saved.exerciseName === name &&
+            (saved.occurrence ?? 0) === occurrence
+    );
+}
+
+
+// Position in the plan of a saved exercise (or -1)
+function getExerciseIndex(dayIndex, savedExercise) {
+
+    const exercises = workouts[dayIndex]?.exercises || [];
+
+    const occurrence = savedExercise.occurrence ?? 0;
+
+    let seen = 0;
+
+    return exercises.findIndex(
+        exercise =>
+            exercise.name === savedExercise.exerciseName &&
+            seen++ === occurrence
+    );
+}
+
 
 function saveExercise(dayIndex, exerciseIndex) {
 
@@ -261,6 +308,9 @@ function saveExercise(dayIndex, exerciseIndex) {
 
         exerciseName:
             exercise.name,
+
+        occurrence:
+            getOccurrence(dayIndex, exerciseIndex),
     
         weight:
             weightInput.value,
@@ -282,8 +332,9 @@ function saveExercise(dayIndex, exerciseIndex) {
     const existingIndex =
         activeWorkout.exercises.findIndex(
             saved =>
-                saved.exerciseName ===
-                exercise.name
+                saved.exerciseName === exercise.name &&
+                (saved.occurrence ?? 0) ===
+                    getOccurrence(dayIndex, exerciseIndex)
         );
 
     if (existingIndex !== -1) {
@@ -337,6 +388,12 @@ function displayWorkout(dayIndex) {
     const workout =
         workouts[dayIndex];
 
+    if (!workout) {
+        showHomeSections();
+        return;
+    }
+
+
     let html = `
 
         <button
@@ -360,21 +417,12 @@ function displayWorkout(dayIndex) {
                         ${exercise.name}
                     </h2>
 
-                    <div class="target">
-
-                        ${exercise.sets}
-                        ×
-                        ${exercise.minReps}–${exercise.maxReps}
-                        /
-                        ${exercise.rir} RIR
-                        /
-                        ${exercise.rest} min
-
-                    </div>
+                    <div class="target">${formatTarget(exercise)}</div>
 
                     ${displayPreviousWorkout(
                         dayIndex,
-                        exercise.name
+                        exercise.name,
+                        getOccurrence(dayIndex, exerciseIndex)
                     )}
 
                     ${createSets(
@@ -400,7 +448,8 @@ function displayWorkout(dayIndex) {
 
                     ${displayHistory(
                         dayIndex,
-                        exercise.name
+                        exercise.name,
+                        getOccurrence(dayIndex, exerciseIndex)
                     )}
 
                 </div>
@@ -443,13 +492,7 @@ function restoreExerciseComments() {
         savedExercise => {
 
             const exerciseIndex =
-                workouts[activeWorkout.dayIndex]
-                    .exercises
-                    .findIndex(
-                        exercise =>
-                            exercise.name ===
-                            savedExercise.exerciseName
-                    );
+                getExerciseIndex(activeWorkout.dayIndex, savedExercise);
 
             if (exerciseIndex === -1) {
                 return;
@@ -502,13 +545,7 @@ function updateSaveExerciseButtons() {
         savedExercise => {
 
             const exerciseIndex =
-                workouts[savedWorkout.dayIndex]
-                    .exercises
-                    .findIndex(
-                        exercise =>
-                            exercise.name ===
-                            savedExercise.exerciseName
-                    );
+                getExerciseIndex(savedWorkout.dayIndex, savedExercise);
 
             if (exerciseIndex === -1) {
                 return;
@@ -540,16 +577,19 @@ function createSets(
     exercise
 ) {
 
+    const occurrence =
+        getOccurrence(dayIndex, exerciseIndex);
+
     let html = "";
 
     /*
      * Current active workout
      */
     const activeExercise =
-        activeWorkout?.exercises?.find(
-            savedExercise =>
-                savedExercise.exerciseName ===
-                exercise.name
+        findSavedExercise(
+            activeWorkout?.exercises,
+            exercise.name,
+            occurrence
         );
 
     /*
@@ -572,11 +612,11 @@ function createSets(
         const previousSession =
             sessions
                 .filter(session =>
-                    session.dayIndex === dayIndex &&
-                    session.exercises.some(
-                        savedExercise =>
-                            savedExercise.exerciseName ===
-                            exercise.name
+                    sessionMatchesDay(session, dayIndex) &&
+                    findSavedExercise(
+                        session.exercises,
+                        exercise.name,
+                        occurrence
                     )
                 )
                 .sort(
@@ -587,11 +627,11 @@ function createSets(
 
         previousWorkout =
             previousSession
-                ? previousSession.exercises.find(
-                    savedExercise =>
-                        savedExercise.exerciseName ===
-                        exercise.name
-                )
+                ? findSavedExercise(
+                        previousSession.exercises,
+                        exercise.name,
+                        occurrence
+                    )
                 : null;
     }
 
@@ -682,7 +722,8 @@ function createSets(
 
 function displayPreviousWorkout(
     dayIndex,
-    exerciseName
+    exerciseName,
+    occurrence = 0
 ) {
 
     const savedSessions =
@@ -698,11 +739,11 @@ function displayPreviousWorkout(
     const previousSession =
         sessions
             .filter(session =>
-                session.dayIndex === dayIndex &&
-                session.exercises.some(
-                    exercise =>
-                        exercise.exerciseName ===
-                        exerciseName
+                sessionMatchesDay(session, dayIndex) &&
+                findSavedExercise(
+                    session.exercises,
+                    exerciseName,
+                    occurrence
                 )
             )
             .sort(
@@ -721,10 +762,10 @@ function displayPreviousWorkout(
     }
 
     const previousExercise =
-        previousSession.exercises.find(
-            exercise =>
-                exercise.exerciseName ===
-                exerciseName
+        findSavedExercise(
+            previousSession.exercises,
+            exerciseName,
+            occurrence
         );
 
     if (!previousExercise) {
@@ -779,7 +820,8 @@ function displayPreviousWorkout(
 
 function displayHistory(
     dayIndex,
-    exerciseName
+    exerciseName,
+    occurrence = 0
 ) {
 
     const savedSessions =
@@ -795,11 +837,11 @@ function displayHistory(
     const exerciseHistory =
         sessions
             .filter(session =>
-                session.dayIndex === dayIndex &&
-                session.exercises.some(
-                    exercise =>
-                        exercise.exerciseName ===
-                        exerciseName
+                sessionMatchesDay(session, dayIndex) &&
+                findSavedExercise(
+                    session.exercises,
+                    exerciseName,
+                    occurrence
                 )
             )
             .sort(
@@ -833,11 +875,11 @@ function displayHistory(
         session => {
 
             const exercise =
-                session.exercises.find(
-                    exercise =>
-                        exercise.exerciseName ===
-                        exerciseName
-                );
+                findSavedExercise(
+            session.exercises,
+            exerciseName,
+            occurrence
+        );
 
             if (!exercise) {
                 return;
@@ -921,10 +963,10 @@ function hasUnsavedChanges() {
         }
 
         const savedExercise =
-            savedExercises.find(
-                saved =>
-                    saved.exerciseName ===
-                    exercise.name
+            findSavedExercise(
+                savedExercises,
+                exercise.name,
+                getOccurrence(dayIndex, exerciseIndex)
             );
 
         // Exercise has never been saved
@@ -1029,7 +1071,10 @@ function saveAllExercises() {
             const savedExercise = {
 
                 exerciseName:
-                    exercise.name,
+            exercise.name,
+
+        occurrence:
+            getOccurrence(dayIndex, exerciseIndex),
 
                 weight:
                     weight,
@@ -1045,10 +1090,11 @@ function saveAllExercises() {
 
             const existingIndex =
                 activeWorkout.exercises.findIndex(
-                    saved =>
-                        saved.exerciseName ===
-                        exercise.name
-                );
+            saved =>
+                saved.exerciseName === exercise.name &&
+                (saved.occurrence ?? 0) ===
+                    getOccurrence(dayIndex, exerciseIndex)
+        );
 
             if (existingIndex !== -1) {
 
@@ -1172,7 +1218,7 @@ function resetSession() {
     // Clear the workout screen
     workoutContainer.innerHTML = "";
 
-    // Return to day selection
+    // Return to the home screen
     showHomeSections();
 
     console.log(
@@ -1245,146 +1291,415 @@ function goBack() {
     showHomeSections();
 }
 
-function importPlan() {
-    const confirmed =
-    confirm(
-        "Warning: importing a new workout plan will replace your current plan.\n\nYour workout history will NOT be deleted.\n\nDo you want to continue?"
-    );
+/* =========================
+   CSV PLAN IMPORT
+   ========================= */
 
-if (!confirmed) {
-    return;
+/*
+ * Picks the delimiter used in the header row.
+ * Spanish/European Excel exports ";" instead of ",".
+ */
+function detectDelimiter(headerLine) {
+
+    const counts = { ",": 0, ";": 0, "\t": 0 };
+
+    let inQuotes = false;
+
+    for (const char of headerLine) {
+
+        if (char === '"') {
+            inQuotes = !inQuotes;
+        } else if (!inQuotes && char in counts) {
+            counts[char]++;
+        }
+    }
+
+    return Object.keys(counts).reduce(
+        (best, d) => counts[d] > counts[best] ? d : best,
+        ","
+    );
 }
 
-    const fileInput =
-        document.getElementById("plan-file");
 
-    const file =
-        fileInput.files[0];
+/*
+ * Small CSV parser: quoted fields, escaped quotes ("")
+ * and delimiters/newlines inside quotes.
+ */
+function parseCSV(text, delimiter) {
+
+    const rows = [];
+
+    let row = [];
+    let field = "";
+    let inQuotes = false;
+
+    for (let i = 0; i < text.length; i++) {
+
+        const char = text[i];
+
+        if (inQuotes) {
+
+            if (char === '"') {
+
+                if (text[i + 1] === '"') {
+                    field += '"';
+                    i++;
+                } else {
+                    inQuotes = false;
+                }
+
+            } else {
+                field += char;
+            }
+
+        } else if (char === '"') {
+
+            inQuotes = true;
+
+        } else if (char === delimiter) {
+
+            row.push(field);
+            field = "";
+
+        } else if (char === "\n" || char === "\r") {
+
+            if (char === "\r" && text[i + 1] === "\n") {
+                i++;
+            }
+
+            row.push(field);
+            rows.push(row);
+            row = [];
+            field = "";
+
+        } else {
+
+            field += char;
+        }
+    }
+
+    if (field !== "" || row.length > 0) {
+        row.push(field);
+        rows.push(row);
+    }
+
+    return rows;
+}
+
+
+/*
+ * Reads a file as UTF-8, falling back to Windows-1252
+ * (Excel "CSV" saved with accents such as á, é, ñ).
+ */
+async function readTextFile(file) {
+
+    const buffer = await file.arrayBuffer();
+
+    try {
+        return new TextDecoder("utf-8", { fatal: true })
+            .decode(buffer);
+    } catch (error) {
+        return new TextDecoder("windows-1252")
+            .decode(buffer);
+    }
+}
+
+
+/*
+ * Columns: Day, Day name, Exercise, Sets, Reps, RIR, Rest (min)
+ * Reps may be a range ("8-12") or a single number ("8").
+ * Returns { plan, errors }. Invalid rows are skipped and reported.
+ */
+function parsePlanCSV(text) {
+
+    text = text.replace(/^\uFEFF/, "");
+
+    const firstLine = text.split(/\r?\n/)[0] || "";
+
+    const rows = parseCSV(text, detectDelimiter(firstLine));
+
+    rows.shift(); // header row
+
+    const days = new Map();
+    const errors = [];
+
+    rows.forEach((columns, index) => {
+
+        const rowNumber = index + 2;
+
+        columns = columns.map(column => column.trim());
+
+        // Ignore completely empty rows
+        if (columns.every(column => column === "")) {
+            return;
+        }
+
+        const [
+            day,
+            dayName,
+            exerciseName,
+            setsText = "",
+            repText = "",
+            rirText = "",
+            restText = ""
+        ] = columns;
+
+        const problem = message => {
+            errors.push(`Row ${rowNumber}: ${message}`);
+        };
+
+        if (!day) {
+            return problem("missing day");
+        }
+
+        if (!exerciseName) {
+            return problem("missing exercise name");
+        }
+
+        const sets = Number(setsText);
+
+        if (
+            setsText === "" ||
+            !Number.isInteger(sets) ||
+            sets < 1 ||
+            sets > 20
+        ) {
+            return problem(
+                `${exerciseName}: invalid sets "${setsText}"`
+            );
+        }
+
+        const repParts = repText.split(/\s*[-–—]\s*/);
+
+        const minReps = Number(repParts[0]);
+
+        const maxReps =
+            repParts.length > 1
+                ? Number(repParts[1])
+                : minReps;
+
+        if (
+            repParts.length > 2 ||
+            repParts[0] === "" ||
+            !Number.isInteger(minReps) ||
+            !Number.isInteger(maxReps) ||
+            minReps < 1 ||
+            maxReps < minReps
+        ) {
+            return problem(
+                `${exerciseName}: invalid reps "${repText}"`
+            );
+        }
+
+        let rest = null;
+
+        if (restText !== "") {
+
+            rest = Number(restText.replace(",", "."));
+
+            if (!Number.isFinite(rest) || rest < 0) {
+                return problem(
+                    `${exerciseName}: invalid rest "${restText}"`
+                );
+            }
+        }
+
+        if (!days.has(day)) {
+            days.set(day, {
+                name: dayName || `Day ${day}`,
+                exercises: []
+            });
+        }
+
+        days.get(day).exercises.push({
+            name: exerciseName,
+            sets: sets,
+            minReps: minReps,
+            maxReps: maxReps,
+            rir: rirText,
+            rest: rest
+        });
+    });
+
+    let entries = [...days.entries()];
+
+    // Numeric day labels are ordered numerically, others keep file order
+    if (entries.every(([key]) => /^\d+$/.test(key))) {
+        entries.sort((a, b) => Number(a[0]) - Number(b[0]));
+    }
+
+    return {
+        plan: entries.map(([, workout]) => workout),
+        errors: errors
+    };
+}
+
+
+/*
+ * "8–12 reps" or "8 reps"; hides RIR / rest if not provided.
+ */
+function formatTarget(exercise) {
+
+    const reps =
+        Number.isFinite(exercise.maxReps) &&
+        exercise.maxReps !== exercise.minReps
+            ? `${exercise.minReps}–${exercise.maxReps}`
+            : `${exercise.minReps}`;
+
+    const parts = [`${exercise.sets} × ${reps}`];
+
+    if (exercise.rir !== "" && exercise.rir != null) {
+        parts.push(`${exercise.rir} RIR`);
+    }
+
+    if (Number.isFinite(exercise.rest)) {
+        parts.push(`${exercise.rest} min`);
+    }
+
+    return parts.join(" / ");
+}
+
+
+async function importPlan() {
+
+    // Importing mid-workout would break the unfinished workout
+    if (localStorage.getItem("active-workout")) {
+        alert(
+            "You have an unfinished workout.\n\nFinish or reset it before importing a new plan."
+        );
+        return;
+    }
+
+    const fileInput = document.getElementById("plan-file");
+
+    const file = fileInput.files[0];
 
     if (!file) {
         alert("Please select a CSV file.");
         return;
     }
 
-    const reader = new FileReader();
+    let text;
 
-    reader.onload = function(event) {
+    try {
+        text = await readTextFile(file);
+    } catch (error) {
+        console.error("Could not read plan file:", error);
+        alert("Could not read the file.");
+        return;
+    }
 
-        const csv =
-            event.target.result;
+    const { plan, errors } = parsePlanCSV(text);
 
-        const rows =
-            csv
-                .trim()
-                .split(/\r?\n/);
+    const preview = errors.slice(0, 5).join("\n") +
+        (errors.length > 5
+            ? `\n…and ${errors.length - 5} more`
+            : "");
 
-        // Remove the header row
-        rows.shift();
-
-        const importedWorkouts = {};
-
-        rows.forEach(row => {
-
-            const columns =
-                row
-                    .split(",")
-                    .map(column => column.trim());
-
-            const day =
-                columns[0];
-
-            const dayName =
-                columns[1];
-
-            const exerciseName =
-                columns[2];
-
-            const sets =
-                columns[3];
-
-            const rep =
-                columns[4];
-
-            const rir =
-                columns[5];
-
-            const rest =
-                columns[6];
-
-
-            if (!day || !exerciseName) {
-                return;
-            }
-
-
-            if (!importedWorkouts[day]) {
-
-                importedWorkouts[day] = {
-
-                    name: dayName,
-
-                    exercises: []
-
-                };
-
-            }
-
-
-            const repParts =
-            rep.split(/[-–—]/);
-
-
-            importedWorkouts[day].exercises.push({
-
-                name: exerciseName,
-
-                sets: Number(sets),
-
-                minReps:
-                    Number(repParts[0]),
-
-                maxReps:
-                    Number(repParts[1]),
-
-                rir: rir,
-
-                rest: Number(rest)
-
-            });
-
-        });
-
-
-        const plan =
-            Object.values(importedWorkouts);
-
-
-        console.log(
-            "Imported plan:",
-            plan
+    if (plan.length === 0) {
+        alert(
+            "No valid exercises found. Your current plan was not changed." +
+            (errors.length ? `\n\n${preview}` : "") +
+            "\n\nExpected columns: Day, Day name, Exercise, Sets, Reps, RIR, Rest (min)"
         );
+        return;
+    }
 
+    const exerciseCount = plan.reduce(
+        (total, day) => total + day.exercises.length,
+        0
+    );
 
+    let message =
+        `Import ${plan.length} days and ${exerciseCount} exercises?\n\n` +
+        "This replaces your current plan. Your workout history will NOT be deleted.";
+
+    if (errors.length) {
+        message =
+            `${errors.length} row(s) will be skipped:\n${preview}\n\n` +
+            message;
+    }
+
+    if (!confirm(message)) {
+        return;
+    }
+
+    try {
         localStorage.setItem(
             "workout-plan",
             JSON.stringify(plan)
         );
+    } catch (error) {
+        console.error("Could not save plan:", error);
+        alert("Could not save the plan (storage full?).");
+        return;
+    }
+
+    workouts = plan;
+
+    displayDayButtons();
+
+    fileInput.value = "";
+
+    alert(
+        `Plan imported successfully: ${plan.length} days`
+    );
+}
 
 
-        workouts = plan;
+/*
+ * A saved session belongs to a plan day if the day NAME matches.
+ * Matching by name (not position) keeps history working when the
+ * plan is re-imported with days reordered or added/removed.
+ * Sessions without a dayName fall back to the old index match.
+ */
+function sessionMatchesDay(session, dayIndex) {
+
+    const day = workouts[dayIndex];
+
+    if (!day) {
+        return false;
+    }
+
+    if (session.dayName) {
+        return session.dayName === day.name;
+    }
+
+    return session.dayIndex === dayIndex;
+}
 
 
-        displayDayButtons();
+/*
+ * Saved exercises of a session, ordered by the current plan when the
+ * exercise still exists in it; others keep their saved order, at the end.
+ * Never throws if the plan has changed.
+ */
+function getSessionExercisesInPlanOrder(session) {
 
+    const saved = session.exercises || [];
 
-        alert(
-            `Plan imported successfully: ${plan.length} days`
+    const day = workouts.find(
+        w => w.name === session.dayName
+    ) || workouts[session.dayIndex];
+
+    if (!day) {
+        return saved;
+    }
+
+    const order = day.exercises.map(e => e.name);
+
+    const rank = exercise => {
+        const occurrence = exercise.occurrence ?? 0;
+        let seen = 0;
+        const i = order.findIndex(
+            name =>
+                name === exercise.exerciseName &&
+                seen++ === occurrence
         );
-
+        return i === -1 ? order.length : i;
     };
 
-
-    reader.readAsText(file);
+    return [...saved].sort((a, b) => rank(a) - rank(b));
 }
 
 
@@ -1507,19 +1822,8 @@ function showHistoryPage() {
              * rather than the order in which
              * exercises were saved.
              */
-            workouts[session.dayIndex].exercises.forEach(
-                plannedExercise => {
-
-                    const exercise =
-                        session.exercises.find(
-                            savedExercise =>
-                                savedExercise.exerciseName ===
-                                plannedExercise.name
-                        );
-
-                    if (!exercise) {
-                        return;
-                    }
+            getSessionExercisesInPlanOrder(session).forEach(
+                exercise => {
 
                     const reps =
                         exercise.sets
@@ -2676,118 +2980,105 @@ function cancelNumberPicker() {
     picker.remove();
 }
 
+/*
+ * One CSV cell: always quoted, quotes escaped.
+ * Text starting with = + - @ would be run as a formula by Excel,
+ * so it gets a leading apostrophe (numbers are left alone).
+ */
+function csvCell(value) {
+
+    let text = String(value ?? "");
+
+    if (
+        /^[=+\-@\t\r]/.test(text) &&
+        !Number.isFinite(Number(text))
+    ) {
+        text = "'" + text;
+    }
+
+    return `"${text.replace(/"/g, '""')}"`;
+}
+
+
 function exportWorkoutHistory() {
 
-    const savedSessions =
-        localStorage.getItem(
-            "workout-sessions"
+    let sessions = [];
+
+    try {
+        sessions = JSON.parse(
+            localStorage.getItem("workout-sessions") || "[]"
         );
+    } catch (error) {
+        console.error("Could not read workout history:", error);
+    }
 
-    const sessions =
-        savedSessions
-            ? JSON.parse(savedSessions)
-            : [];
-
-    if (sessions.length === 0) {
-
-        alert(
-            "There is no workout history to export."
-        );
-
+    if (!Array.isArray(sessions) || sessions.length === 0) {
+        alert("There is no workout history to export.");
         return;
     }
 
-    const rows = [];
+    // As many "Set N" columns as the longest saved exercise needs
+    const maxSets = Math.max(
+        1,
+        ...sessions.flatMap(session =>
+            (session.exercises || []).map(
+                exercise => (exercise.sets || []).length
+            )
+        )
+    );
 
-    rows.push([
+    const header = [
         "Workout Date",
         "Day",
         "Exercise",
         "Weight (kg)",
-        "Set 1",
-        "Set 2",
-        "Set 3",
-        "Set 4",
-        "Set 5",
-        "Set 6",
+        ...Array.from(
+            { length: maxSets },
+            (_, i) => `Set ${i + 1}`
+        ),
         "Comment"
-    ]);
+    ];
 
-    sessions.forEach(
-        session => {
+    const rows = [header];
 
-            const workoutDate =
-                new Date(
-                    session.completedAt
-                ).toLocaleDateString(
-                    "en-GB"
-                );
+    sessions.forEach(session => {
 
-            session.exercises.forEach(
-                exercise => {
+        const workoutDate =
+            new Date(session.completedAt)
+                .toLocaleDateString("en-GB");
 
-                    const reps =
-                        exercise.sets.map(
-                            set => set.reps
-                        );
+        (session.exercises || []).forEach(exercise => {
 
-                    rows.push([
-                        workoutDate,
-                        session.dayName,
-                        exercise.exerciseName,
-                        exercise.weight || "",
-                        reps[0] || "",
-                        reps[1] || "",
-                        reps[2] || "",
-                        reps[3] || "",
-                        reps[4] || "",
-                        reps[5] || "",
-                        exercise.comment || ""
-                    ]);
+            const sets = exercise.sets || [];
 
-                }
-            );
-        }
-    );
+            rows.push([
+                workoutDate,
+                session.dayName,
+                exercise.exerciseName,
+                exercise.weight ?? "",
+                ...Array.from(
+                    { length: maxSets },
+                    (_, i) => sets[i]?.reps ?? ""
+                ),
+                exercise.comment || ""
+            ]);
+        });
+    });
 
     const csv =
         rows
-            .map(
-                row =>
-                    row
-                        .map(
-                            value => {
+            .map(row => row.map(csvCell).join(","))
+            .join("\r\n");
 
-                                const text =
-                                    String(
-                                        value ?? ""
-                                    );
+    // The BOM makes Excel read the file as UTF-8 (accents, ñ, …)
+    const blob = new Blob(
+        ["\uFEFF" + csv],
+        { type: "text/csv;charset=utf-8;" }
+    );
 
-                                return `"${text.replace(
-                                    /"/g,
-                                    '""'
-                                )}"`;
+    const url = URL.createObjectURL(blob);
 
-                            }
-                        )
-                        .join(",")
-            )
-            .join("\n");
-
-    const blob =
-        new Blob(
-            [csv],
-            {
-                type:
-                    "text/csv;charset=utf-8;"
-            }
-        );
-
-    const url =
-        URL.createObjectURL(blob);
-
-    const link =
-        document.createElement("a");
+    const link = document.createElement("a");
 
     link.href = url;
 
@@ -2797,13 +3088,13 @@ function exportWorkoutHistory() {
             .slice(0, 10)}.csv`;
 
     document.body.appendChild(link);
-
     link.click();
-
     document.body.removeChild(link);
 
-    URL.revokeObjectURL(url);
+    // Revoking immediately can cancel the download in some browsers
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
+
 
 function showMeasurementsPage() {
 
