@@ -1,4 +1,4 @@
-console.log("GYM TRACKER APP JS - VERSION 26");
+console.log("GYM TRACKER APP JS - VERSION 28");
 
 let workouts = [];
 let activeWorkout = null;
@@ -331,6 +331,8 @@ function saveExercise(dayIndex, exerciseIndex) {
 
 
 function displayWorkout(dayIndex) {
+
+    hideHomeSections();
 
     const workout =
         workouts[dayIndex];
@@ -1147,8 +1149,7 @@ function finishWorkout() {
 
     workoutContainer.innerHTML = "";
 
-    daySelection.style.display =
-        "block";
+    showHomeSections();
 }
 
 function resetSession() {
@@ -1172,7 +1173,7 @@ function resetSession() {
     workoutContainer.innerHTML = "";
 
     // Return to day selection
-    daySelection.style.display = "block";
+    showHomeSections();
 
     console.log(
         "Active workout after reset:",
@@ -1418,7 +1419,7 @@ displayDayButtons();
 
 function showHistoryPage() {
 
-    daySelection.style.display = "none";
+    hideHomeSections();
 
     const savedSessions =
         localStorage.getItem(
@@ -1578,7 +1579,7 @@ function goBackFromHistory() {
 
     workoutContainer.innerHTML = "";
 
-    daySelection.style.display = "block";
+    showHomeSections();
 }
 
 function resetWorkoutData() {
